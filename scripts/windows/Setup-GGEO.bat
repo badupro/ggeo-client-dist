@@ -1,19 +1,20 @@
 @echo off
 REM GGEO Client - One-Click Setup Wizard (Windows)
 REM
-REM Sebelum jalankan:
-REM   1. Clone repo (mis. ke C:\ggeo-client)
-REM   2. Install Python 3.11+ dari https://python.org
-REM      CENTANG "Add Python to PATH"
-REM   3. Install iTunes (untuk Apple Mobile Device Service + Bonjour)
-REM   4. Punya Host URL + API key dari operator GGEO Host
-REM      (host admin -> Clients -> [Add] -> copy api_key)
+REM Pre-requisites:
+REM   1. Clone repo (e.g., to C:\ggeo-client)
+REM   2. Install Python 3.11+ from https://python.org
+REM      CHECK "Add Python to PATH" during install
+REM   3. Install iTunes (for Apple Mobile Device Service + Bonjour)
+REM   4. Host URL + API key from the GGEO Host operator
+REM      (host admin -^> Clients -^> [Add] -^> copy api_key)
 REM
-REM Cara pakai:
-REM   Double-click Setup-GGEO.bat dari File Explorer.
-REM   Wizard akan membuat venv, install deps, prompt host URL + api_key,
-REM   buat client_admin account, save config, BUAT SHORTCUT, opt-in
-REM   autostart. Setelah selesai double-click "GGEO Client" di Desktop.
+REM Usage:
+REM   Double-click Setup-GGEO.bat from File Explorer.
+REM   The wizard creates the venv, installs dependencies, prompts for
+REM   host URL + api_key, creates a client_admin account, saves config,
+REM   creates a desktop shortcut, and optionally enables autostart.
+REM   When setup finishes, double-click "GGEO Client" on the Desktop.
 
 setlocal enabledelayedexpansion
 
@@ -30,12 +31,12 @@ echo.
 
 cd /d "%REPO_DIR%"
 
-REM Cek Python
+REM Check Python
 where python >nul 2>nul
 if errorlevel 1 (
-    echo ERROR: python tidak ada di PATH.
-    echo Install Python 3.11+ dari https://python.org
-    echo CENTANG "Add Python to PATH" saat install.
+    echo ERROR: python not found in PATH.
+    echo Install Python 3.11+ from https://python.org
+    echo Make sure to CHECK "Add Python to PATH" during install.
     pause
     exit /b 1
 )
@@ -44,19 +45,19 @@ for /f "tokens=2" %%i in ('python --version 2^>^&1') do set PY_VER=%%i
 echo Python detected: %PY_VER%
 echo.
 
-REM Run wizard - semua langkah (venv, deps, host, shortcut, autostart)
-REM di dalam setup.py.
+REM Run wizard - all steps (venv, deps, host, shortcut, autostart)
+REM are inside setup.py.
 python setup.py
 
 set EXIT_CODE=%errorlevel%
 echo.
 echo ==================================================
 if %EXIT_CODE% EQU 0 (
-    echo   Setup berhasil! Tutup window ini.
+    echo   Setup complete.
     echo.
-    echo   Untuk jalankan server, double-click "GGEO Client" di Desktop.
+    echo   To start the server, double-click "GGEO Client" on the Desktop.
 ) else (
-    echo   Setup error ^(exit %EXIT_CODE%^). Lihat pesan di atas.
+    echo   Setup failed ^(exit %EXIT_CODE%^). See messages above.
 )
 echo ==================================================
 pause
