@@ -106,8 +106,7 @@ def check_and_update() -> bool:
 
     if _hash_file(REQUIREMENTS) != req_hash_before:
         logger.info(
-            "auto-update: requirements.txt changed, installing dependencies "
-            "(jangan close window) ..."
+            "auto-update: requirements.txt changed, installing dependencies ..."
         )
         try:
             subprocess.run(

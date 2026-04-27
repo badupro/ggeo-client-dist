@@ -188,7 +188,7 @@ def step_virtualenv() -> None:
     if VENV_DIR.exists():
         ok(f"venv already exists: {VENV_DIR}")
         return
-    info(f"Creating venv at {VENV_DIR} ... (~30s, jangan close window)")
+    info(f"Creating virtual environment at {VENV_DIR} ...")
     rc = run_with_spinner(
         [sys.executable, "-m", "venv", str(VENV_DIR)],
         idle_label="creating virtualenv ...",
@@ -217,14 +217,14 @@ def step_install_deps() -> None:
     if rc != 0:
         warn("pip upgrade had warnings (non-fatal).")
 
-    info(f"Installing dependencies dari {req.name} ... (~1 menit, sabar ya)")
+    info(f"Installing dependencies from {req.name} ...")
     rc = run_with_spinner(
         [str(py), "-m", "pip", "install", "-r", str(req)],
         idle_label="resolving dependencies ...",
         timeout=600,
     )
     if rc != 0:
-        fail("pip install failed. Coba jalankan manual untuk melihat error:")
+        fail("pip install failed. Run manually to inspect the error:")
         print(f"    {py} -m pip install -r {req}")
         sys.exit(1)
     ok("Dependencies installed.")
@@ -307,12 +307,12 @@ def step_service_checks() -> None:
 
 
 def prompt_url() -> str:
-    info("Host URL diberikan oleh operator GGEO Host yang kelola admin panel.")
-    info("Format: https://your-host-domain (tanpa trailing slash).")
+    info("Host URL is provided by the GGEO Host operator.")
+    info("Format: https://your-host-domain (no trailing slash).")
     while True:
         url = input("    Host URL: ").strip()
         if not url:
-            print("    Host URL wajib diisi.")
+            print("    Host URL is required.")
             continue
         if url.startswith("http://") or url.startswith("https://"):
             return url.rstrip("/")
@@ -320,11 +320,11 @@ def prompt_url() -> str:
 
 
 def prompt_api_key() -> str:
-    info("API key juga didapat dari host admin panel (Clients > [Add] > copy).")
+    info("API key is obtained from the host admin panel (Clients > [Add] > copy).")
     while True:
         key = input("    API key: ").strip()
         if not key:
-            print("    API key wajib diisi.")
+            print("    API key is required.")
             continue
         if key.startswith("ggeo_") and key.count("_") >= 2:
             return key
