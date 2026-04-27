@@ -1,0 +1,10 @@
+run.py binary
+tray.py binary
+ggeo/app.py binary
+ggeo/config.py binary
+ggeo/session.py binary
+ggeo/sync/agent.py binary
+ggeo/sync/status.py binary
+ggeo/device/location.py binary
+ggeo/routes/auth.py binary
+ggeo/routes/device.py binary

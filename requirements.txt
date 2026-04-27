@@ -1,0 +1,30 @@
+# GGEO client runtime dependencies
+# Install with: pip install -r requirements.txt
+
+# Web framework (local UI)
+fastapi>=0.115.0
+uvicorn>=0.32.0
+sse-starlette>=2.1.0
+
+# iOS device control (GPS engine) — pinned because 9.10.x introduced
+# a tunnel regression on iOS 26.
+pymobiledevice3==9.9.1
+
+# Host API client
+httpx>=0.27
+
+# Authentication (still used locally for session cookie signing)
+bcrypt>=4.2.0
+itsdangerous>=2.1.0
+
+# mDNS (ggeo.local)
+zeroconf>=0.136.0
+
+# System tray app
+pystray>=0.19.5
+pillow>=10.0.0
+
+# Windows-only: WinTUN kernel driver for pymobiledevice3 iOS 17.4+ tunnel.
+# Skipped on macOS / Linux via platform marker.
+pywintunx-pmd3>=1.0.2; sys_platform == "win32"
+

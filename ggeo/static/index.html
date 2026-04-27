@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GGEO</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=51">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v=51">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=51">
+    <link rel="stylesheet" href="/static/css/style.css?v=51">
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="/static/js/version-badge.js?v=51"></script>
+</head>
+<body class="vpn-mode">
+    <div class="app-layout">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <img src="/static/logo.png?v=51" alt="GGEO" class="logo-img">
+                <span class="logo">GGEO</span>
+                <span class="version">v1.0</span>
+            </div>
+            <div class="header-right">
+                <span class="view-switcher" id="view-switcher" hidden>
+                    <a class="view-switcher-btn active" href="/" data-i18n="view_user">User</a>
+                    <a class="view-switcher-btn" href="/admin" data-i18n="view_admin">Admin</a>
+                </span>
+                <span class="lang-toggle">
+                    <button class="lang-toggle-btn" data-lang="en" onclick="I18N.toggle('en')">EN</button>
+                    <button class="lang-toggle-btn" data-lang="id" onclick="I18N.toggle('id')">ID</button>
+                </span>
+                <div class="user-menu" id="user-menu">
+                    <button class="avatar-btn" id="avatar-btn" onclick="toggleUserMenu()" aria-expanded="false" aria-label="User menu"><span id="avatar-initial">?</span></button>
+                    <div class="user-menu-dropdown" id="user-menu-dropdown" hidden>
+                        <div class="user-menu-info">
+                            <div class="user-menu-name" id="user-menu-name">--</div>
+                            <div class="user-menu-role" id="user-menu-role">--</div>
+                        </div>
+                        <button class="user-menu-item" onclick="showAccountModal(); toggleUserMenu(false);">
+                            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <span data-i18n="account">Change Password</span>
+                        </button>
+                    </div>
+                </div>
+                <button class="icon-btn" onclick="doLogout()" data-i18n-title="logout" title="Log out" aria-label="Log out">
+                    <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Account Modal -->
+        <div id="account-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;padding:20px;">
+            <div class="card" style="max-width:380px;width:100%;padding:24px;">
+                <div class="section-title" style="margin-bottom:16px" data-i18n="new_password">Change Password</div>
+                <input type="password" class="input" id="cur-pass" data-i18n-placeholder="current_password" placeholder="Current password" style="margin-bottom:8px">
+                <input type="password" class="input" id="new-pass" data-i18n-placeholder="new_password" placeholder="New password (min 8 chars)" style="margin-bottom:8px">
+                <input type="password" class="input" id="confirm-pass" data-i18n-placeholder="confirm_password" placeholder="Confirm new password" style="margin-bottom:12px">
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-primary" style="flex:1" onclick="changePassword()" data-i18n="save">Save</button>
+                    <button class="btn btn-outline" style="flex:1" onclick="hideAccountModal()" data-i18n="cancel">Cancel</button>
+                </div>
+                <div class="error" id="pass-error" style="color:#ef4444;font-size:12px;margin-top:8px;min-height:16px"></div>
+            </div>
+        </div>
+
+        <!-- Default password warning (admin only) -->
+        <div id="default-pass-banner" class="warning-banner" style="display:none" data-i18n="banner_default_pass">
+            Default password aktif. Ganti segera via Account.
+        </div>
+
+        <!-- Locked user message -->
+        <div id="locked-banner" style="display:none;padding:8px 16px;background:rgba(245,158,11,0.1);border-bottom:1px solid rgba(245,158,11,0.2);text-align:center;font-size:13px;color:#f59e0b;" data-i18n="banner_locked">
+            Location controlled by admin
+        </div>
+
+        <!-- Body -->
+        <div class="app-body">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-handle"></div>
+                <div class="sidebar-peek" id="sidebar-peek">
+                    <span class="sidebar-peek-label" data-i18n="controls">Controls</span>
+                </div>
+
+                <!-- VPN-style power button -->
+                <div class="vpn-hero" id="vpn-hero">
+                    <button type="button" class="vpn-power-btn" id="vpn-power-btn"
+                            onclick="onVpnPowerClick()" aria-label="Toggle GPS">
+                        <span class="vpn-ring vpn-ring-outer"></span>
+                        <span class="vpn-ring vpn-ring-mid"></span>
+                        <span class="vpn-power-inner">
+                            <svg viewBox="0 0 24 24" class="vpn-power-icon" aria-hidden="true">
+                                <path d="M12 2v10" stroke-width="2.5" stroke-linecap="round"/>
+                                <path d="M5.5 6.5a8 8 0 1 0 13 0" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="vpn-hero-status" id="vpn-hero-status">Tidak terhubung</div>
+                    <div class="vpn-hero-meta">
+                        <span id="vpn-hero-device">--</span>
+                        <span class="vpn-sep">&middot;</span>
+                        <span id="vpn-hero-location">--</span>
+                    </div>
+                    <div class="vpn-hero-timer" id="vpn-hero-timer" hidden>00:00:00</div>
+                    <div class="vpn-multi-chip" id="vpn-multi-chip" hidden>0 sesi aktif total</div>
+                </div>
+
+                <!-- Map toggle (mobile only) -->
+                <div class="sidebar-section map-toggle-section" id="map-toggle-section" hidden>
+                    <button type="button" class="btn btn-outline btn-full" id="map-toggle-btn" onclick="toggleMapDrawer()">
+                        <svg viewBox="0 0 24 24" class="map-toggle-icon" aria-hidden="true" width="18" height="18">
+                            <path d="M1 6v16l7-3 8 3 7-3V3l-7 3-8-3-7 3z" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M8 3v17M16 6v17" stroke-width="2" fill="none" stroke-linecap="round"/>
+                        </svg>
+                        <span id="map-toggle-label">Buka Peta</span>
+                    </button>
+                </div>
+
+                <!-- Device Panel -->
+                <div class="sidebar-section">
+                    <div class="section-title" data-i18n="device">Device</div>
+                    <div id="bonjour-silent-hint" hidden style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:8px;margin-bottom:8px;font-size:0.9em;color:#856404"></div>
+                    <div id="wifi-unreachable-hint" hidden style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:8px;margin-bottom:8px;font-size:0.9em;color:#856404"></div>
+                    <div id="scan-progress" class="scan-progress" hidden></div>
+                    <div style="display:flex;gap:6px;margin-bottom:12px">
+                        <select id="device-select" disabled style="flex:1;margin-bottom:0">
+                            <option value="" data-i18n="scanning">Scanning...</option>
+                        </select>
+                        <button class="btn btn-outline btn-sm" id="scan-btn" onclick="Device.scan()" style="flex-shrink:0" data-i18n="scan">Scan</button>
+                    </div>
+
+                    <!-- Location dropdown (locked: assigned only, free: all globals as quick-pick) -->
+                    <div id="location-picker-wrap" style="display:none">
+                        <div class="section-title" id="location-picker-label" data-i18n="location">Location</div>
+                        <select class="input" id="location-picker" onchange="handleLocationPick()" style="margin-bottom:8px">
+                            <option value="">-- select --</option>
+                        </select>
+                        <div id="current-location-name" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;display:none"></div>
+                    </div>
+
+                    <div class="section-title" id="coords-label" data-i18n="coordinates">Coordinates</div>
+                    <div class="input-group" style="margin-bottom:6px">
+                        <input type="text" class="input" id="lat-input" data-i18n-placeholder="th_latitude" placeholder="Latitude" value="-6.2088">
+                        <input type="text" class="input" id="lon-input" data-i18n-placeholder="th_longitude" placeholder="Longitude" value="106.8456">
+                    </div>
+                    <button class="btn btn-ghost btn-full btn-sm" id="save-preset-btn" onclick="Presets.save()" style="margin-bottom:10px;display:none" data-i18n="save_preset">+ Save as preset</button>
+                    <button class="btn btn-success btn-full" id="activate-btn" onclick="Device.activateSelected()" disabled style="margin-bottom:6px" data-i18n="activate">Activate</button>
+                    <button class="btn btn-primary btn-full btn-sm" id="apply-btn" onclick="applyLocation()" style="display:none">Apply Location</button>
+                    <button class="btn btn-outline btn-full btn-sm" id="goto-btn" onclick="gotoActiveLocation()" style="margin-top:6px;display:none">Go to active location</button>
+                </div>
+
+                <!-- Active Sessions -->
+                <div class="sidebar-section">
+                    <div class="section-title"><span data-i18n="active_sessions">Active Sessions</span> (<span id="active-count">0</span>)</div>
+                    <div id="sessions-container">
+                        <div class="empty-state" data-i18n="empty_sessions">No active sessions</div>
+                    </div>
+                </div>
+
+                <!-- Presets (free users only) — collapsible, default collapsed -->
+                <div class="sidebar-section collapsible collapsed" id="presets-panel" style="display:none">
+                    <div class="section-title section-title-toggle" onclick="toggleSection('presets-panel', event)">
+                        <span class="section-title-label" data-i18n="presets">Presets</span>
+                        <div class="section-title-right">
+                            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); Presets.save()" style="padding:2px 8px;font-size:10px" data-i18n="save">+ Save</button>
+                            <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                        </div>
+                    </div>
+                    <div class="sidebar-section-body">
+                        <div id="presets-list"></div>
+                    </div>
+                </div>
+
+                <!-- History — collapsible, default collapsed -->
+                <div class="sidebar-section collapsible collapsed" id="history-panel" style="display:none">
+                    <div class="section-title section-title-toggle" onclick="toggleSection('history-panel', event)">
+                        <span class="section-title-label" data-i18n="history">History</span>
+                        <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="sidebar-section-body">
+                        <div id="history-list"></div>
+                        <div id="history-pager" class="history-pager" hidden></div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Map Area -->
+            <main class="map-area" id="map-area">
+                <!-- Close-map FAB (mobile drawer) -->
+                <button type="button" class="map-close-fab" id="map-close-fab" onclick="toggleMapDrawer()" aria-label="Tutup Peta">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+                    </svg>
+                </button>
+                <!-- Search -->
+                <div class="search-bar">
+                    <input type="text" class="search-input" id="search-input" data-i18n-placeholder="search_location" placeholder="Search location...">
+                    <div class="search-results" id="search-results"></div>
+                </div>
+
+                <!-- Map -->
+                <div class="map-container">
+                    <div id="map"></div>
+                </div>
+
+                <!-- Map overlay — hover coords -->
+                <div class="map-overlay">
+                    <div class="map-coords" id="map-coords">--, --</div>
+                </div>
+
+            </main>
+        </div>
+
+        <!-- Author footer -->
+        <footer class="app-footer">
+            <div class="footer-row">
+                <span>Made with <span class="heart">♥</span> by
+                    <a href="https://github.com/badupro" target="_blank" rel="noopener">Gpro</a>
+                </span>
+                <span class="footer-sep">·</span>
+                <a href="https://github.com/badupro" target="_blank" rel="noopener" title="GitHub">
+                    <svg viewBox="0 0 16 16" class="github-icon"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                    badupro
+                </a>
+            </div>
+            <span class="footer-sep footer-sep-badge">·</span>
+            <span class="ai-badge">Assisted by Claude Opus 4.6 &amp; 4.7 (Anthropic)</span>
+            <span class="footer-sep footer-sep-badge">·</span>
+            <span class="footer-nav-links">
+                <a href="/about">About</a>
+                <a href="/faq">FAQ</a>
+                <a href="/guide">Guide</a>
+                <a href="/terms">Terms</a>
+            </span>
+        </footer>
+    </div>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/static/js/i18n.js?v=51"></script>
+    <script src="/static/js/app.js?v=51"></script>
+    <script src="/static/js/map.js?v=51"></script>
+    <script src="/static/js/device.js?v=51"></script>
+    <script src="/static/js/presets.js?v=51"></script>
+    <script src="/static/js/history.js?v=51"></script>
+    <script>
+        // Initialize i18n first (reads localStorage, applies current language)
+        I18N.init();
+
+        // Initialize map
+        GMap.init("map");
+
+        // Initialize search
+        GMap.initSearch("search-input", "search-results");
+
+        // When location selected on map, update sidebar inputs
+        GMap.onSelect(function(lat, lon) {
+            document.getElementById("lat-input").value = lat.toFixed(8);
+            document.getElementById("lon-input").value = lon.toFixed(8);
+        });
+
+        // Fly map when coordinate inputs change
+        function flyToInputCoords() {
+            var lat = parseFloat(document.getElementById("lat-input").value);
+            var lon = parseFloat(document.getElementById("lon-input").value);
+            if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                GMap.setPin(lat, lon);
+                GMap.flyTo(lat, lon);
+            }
+        }
+
+        document.getElementById("lat-input").addEventListener("change", flyToInputCoords);
+        document.getElementById("lon-input").addEventListener("change", flyToInputCoords);
+
+        // Auto-fill coordinate paste + fly
+        App.setupCoordAutofill(
+            document.getElementById("lat-input"),
+            document.getElementById("lon-input")
+        );
+        // After paste, fly to new coords
+        document.getElementById("lat-input").addEventListener("paste", function() {
+            setTimeout(flyToInputCoords, 50);
+        });
+
+        // Reset — deactivate selected device
+        function resetLocation() {
+            var select = document.getElementById("device-select");
+            if (select.value) {
+                Device.deactivate(select.value);
+            }
+        }
+
+        function gotoActiveLocation() {
+            var lat = parseFloat(document.getElementById("lat-input").value);
+            var lon = parseFloat(document.getElementById("lon-input").value);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                GMap.flyTo(lat, lon);
+            }
+        }
+
+        // Handle Location picker change (locked: switch current; free: quick-fill)
+        async function handleLocationPick() {
+            var sel = document.getElementById("location-picker");
+            if (!sel.value) return;
+            var opt = sel.options[sel.selectedIndex];
+            var lat = parseFloat(opt.dataset.lat);
+            var lon = parseFloat(opt.dataset.lon);
+            var name = opt.dataset.name;
+            document.getElementById("lat-input").value = lat;
+            document.getElementById("lon-input").value = lon;
+            if (typeof GMap !== "undefined" && GMap.setPin) {
+                GMap.setPin(lat, lon);
+                GMap.flyTo(lat, lon);
+            }
+
+            // Locked user: persist current_location on backend
+            if (currentUser && currentUser.location_permission === "locked") {
+                try {
+                    await App.api("PUT", "/api/user/current-location", {location_id: parseInt(sel.value)});
+                    var el = document.getElementById("current-location-name");
+                    el.textContent = "Current: " + name;
+                    el.style.display = "block";
+                    App.toast("Current location: " + name);
+                } catch (e) {
+                    App.toast(e.message, true);
+                }
+            } else {
+                // Free user: just fill fields
+                App.toast("Loaded: " + name);
+            }
+        }
+
+        (function() {
+            var sel = document.getElementById("device-select");
+            if (!sel) return;
+            sel.addEventListener("change", function() {
+                var btn = document.getElementById("activate-btn");
+                if (btn) btn.disabled = !sel.value;
+            });
+        })();
+        Device.scan().then(function() {
+            var select = document.getElementById("device-select");
+            var btn = document.getElementById("activate-btn");
+            if (btn) btn.disabled = !select.value;
+        });
+
+        // Auth — load user info, setup permission UI
+        var currentUser = null;
+        (async function() {
+            try {
+                var data = await App.api("GET", "/api/auth/me");
+                currentUser = data;
+                document.getElementById("avatar-initial").textContent =
+                    (data.username || "?").charAt(0);
+                document.getElementById("user-menu-name").textContent = data.username;
+                document.getElementById("user-menu-role").textContent = data.role;
+
+                var picker = document.getElementById("location-picker");
+                var pickerWrap = document.getElementById("location-picker-wrap");
+                var pickerLabel = document.getElementById("location-picker-label");
+                var assignedLocations = [];
+                var isAdminPicker = data.role === "client_admin"
+                    && data.location_permission !== "locked";
+                try {
+                    if (isAdminPicker) {
+                        assignedLocations = await App.api("GET", "/api/admin/locations");
+                    } else {
+                        assignedLocations = await App.api("GET", "/api/device/locations");
+                    }
+                } catch (e) { /* non-fatal, show empty */ }
+
+                var showPicker = data.location_permission === "locked"
+                    || isAdminPicker
+                    || assignedLocations.length > 0;
+                if (showPicker) {
+                    pickerWrap.style.display = "block";
+                    picker.innerHTML = '<option value="">-- pilih lokasi --</option>';
+                    assignedLocations.forEach(function(loc) {
+                        var opt = document.createElement("option");
+                        opt.value = loc.id;
+                        opt.textContent = loc.name;
+                        opt.dataset.lat = loc.latitude;
+                        opt.dataset.lon = loc.longitude;
+                        opt.dataset.name = loc.name;
+                        if (data.global_location_id && loc.id === data.global_location_id) {
+                            opt.selected = true;
+                        }
+                        picker.appendChild(opt);
+                    });
+                    pickerLabel.textContent = data.location_permission === "locked"
+                        ? "Assigned Location"
+                        : (isAdminPicker ? "Lokasi Tersedia" : "Quick Location");
+                    if (data.location_permission === "locked" && assignedLocations.length === 0) {
+                        // Tell the user why the dropdown is empty.
+                        picker.innerHTML =
+                            '<option value="">Belum ada lokasi di-assign oleh admin</option>';
+                        picker.disabled = true;
+                    } else if (isAdminPicker && assignedLocations.length === 0) {
+                        picker.innerHTML =
+                            '<option value="">Belum ada lokasi terdaftar - tambahkan di Admin Panel</option>';
+                        picker.disabled = true;
+                    }
+                }
+
+                var vpnHeroShow = document.getElementById("vpn-hero");
+                var heroDevice = document.getElementById("vpn-hero-device");
+                var heroLocation = document.getElementById("vpn-hero-location");
+                var latEl = document.getElementById("lat-input");
+                var lonEl = document.getElementById("lon-input");
+                var devSel = document.getElementById("device-select");
+
+                // Pre-fill hero location from picker if it has a preselect.
+                if (heroLocation && picker.selectedOptions[0]
+                    && picker.selectedOptions[0].value) {
+                    heroLocation.textContent = picker.selectedOptions[0].dataset.name
+                        || picker.selectedOptions[0].text;
+                }
+                if (data.location_permission === "locked") {
+                    document.body.classList.add("locked-mode");
+                    var lockedBanner = document.getElementById("locked-banner");
+                    if (lockedBanner) lockedBanner.style.display = "block";
+                    var mapEl = document.getElementById("map");
+                    if (mapEl) mapEl.style.display = "none";
+                    var coordsLabel = document.getElementById("coords-label");
+                    if (coordsLabel) coordsLabel.style.display = "none";
+                    if (latEl) latEl.style.display = "none";
+                    if (lonEl) lonEl.style.display = "none";
+                    var searchEl = document.getElementById("search-input");
+                    if (searchEl) { searchEl.disabled = true; searchEl.style.display = "none"; }
+                    if (picker.selectedOptions[0] && picker.selectedOptions[0].dataset.lat) {
+                        latEl.value = picker.selectedOptions[0].dataset.lat;
+                        lonEl.value = picker.selectedOptions[0].dataset.lon;
+                    }
+                }
+
+                // Sync hero meta on any relevant control change (all roles).
+                var syncHeroDevice = function() {
+                    if (!heroDevice) return;
+                    var opt = devSel && devSel.selectedOptions[0];
+                    heroDevice.textContent = (opt && opt.value)
+                        ? opt.text.split(" (")[0]
+                        : "--";
+                };
+                var syncHeroLocation = function() {
+                    if (!heroLocation) return;
+                    if (picker && picker.value && picker.selectedOptions[0]) {
+                        heroLocation.textContent = picker.selectedOptions[0].dataset.name
+                            || picker.selectedOptions[0].text;
+                        return;
+                    }
+                    if (latEl && lonEl && latEl.value && lonEl.value) {
+                        var lat = parseFloat(latEl.value);
+                        var lon = parseFloat(lonEl.value);
+                        if (!isNaN(lat) && !isNaN(lon)) {
+                            heroLocation.textContent = lat.toFixed(4) + ", " + lon.toFixed(4);
+                            return;
+                        }
+                    }
+                    heroLocation.textContent = "--";
+                };
+                if (devSel) {
+                    devSel.addEventListener("change", syncHeroDevice);
+                    syncHeroDevice();
+                }
+                ["lat-input","lon-input","location-picker"].forEach(function(id) {
+                    var el = document.getElementById(id);
+                    if (el) el.addEventListener("change", syncHeroLocation);
+                });
+                syncHeroLocation();
+
+                if (typeof Device !== "undefined" && Device._onStatusChange) {
+                    Device._onStatusChange(function(isOn, name, summary) {
+                        var hero = document.getElementById("vpn-hero");
+                        var statusTxt = document.getElementById("vpn-hero-status");
+                        var timerEl = document.getElementById("vpn-hero-timer");
+                        var chipEl = document.getElementById("vpn-multi-chip");
+                        if (!hero || !statusTxt) return;
+                        hero.classList.toggle("is-on", !!isOn);
+                        statusTxt.textContent = isOn ? "Terhubung" : "Tidak terhubung";
+                        if (name && heroDevice) heroDevice.textContent = name;
+                        if (chipEl) {
+                            var total = (summary && summary.totalActive) || 0;
+                            if (total > 1) {
+                                chipEl.hidden = false;
+                                chipEl.textContent = total + " sesi aktif total";
+                            } else {
+                                chipEl.hidden = true;
+                            }
+                        }
+                        if (isOn) {
+                            if (timerEl) {
+                                timerEl.hidden = false;
+                                var startAt = Date.now();
+                                if (summary && summary.sessionsByUdid
+                                    && summary.selectedUdid
+                                    && summary.sessionsByUdid[summary.selectedUdid]
+                                    && summary.sessionsByUdid[summary.selectedUdid].spoof_started_at) {
+                                    startAt = summary.sessionsByUdid[summary.selectedUdid].spoof_started_at * 1000;
+                                }
+                                clearInterval(window.__vpnTimer);
+                                window.__vpnTimer = setInterval(function() {
+                                    var sec = Math.max(0, Math.floor((Date.now() - startAt) / 1000));
+                                    var h = String(Math.floor(sec/3600)).padStart(2,"0");
+                                    var m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
+                                    var s = String(sec%60).padStart(2,"0");
+                                    timerEl.textContent = h + ":" + m + ":" + s;
+                                }, 1000);
+                            }
+                        } else {
+                            if (timerEl) timerEl.hidden = true;
+                            clearInterval(window.__vpnTimer);
+                        }
+                    });
+                }
+
+                if (devSel && Device && Device.recomputeSelectedState) {
+                    devSel.addEventListener("change", function() {
+                        Device.recomputeSelectedState();
+                    });
+                }
+
+                // Presets only for free users
+                if (data.location_permission === "free") {
+                    document.getElementById("presets-panel").style.display = "block";
+                    document.getElementById("save-preset-btn").style.display = "block";
+                    Presets.init();
+                }
+                // History for everyone
+                document.getElementById("history-panel").style.display = "block";
+                History.init();
+
+                if (data.role === "client_admin" || data.role === "admin") {
+                    document.getElementById("view-switcher").hidden = false;
+                }
+
+                // Default password warning banner (admin only)
+                if (data.is_default_password === true) {
+                    document.getElementById("default-pass-banner").style.display = "block";
+                }
+            } catch (e) {
+                window.location.href = "/login";
+            }
+        })();
+
+        async function doLogout() {
+            try { await fetch("/api/auth/logout", {method: "POST"}); } catch(e) {}
+            window.location.href = "/login";
+        }
+
+        function toggleMapDrawer() {
+            var mapArea = document.getElementById("map-area");
+            if (!mapArea) return;
+            var expanded = mapArea.classList.toggle("expanded");
+            var label = document.getElementById("map-toggle-label");
+            if (label) label.textContent = expanded ? "Tutup Peta" : "Buka Peta";
+            var btn = document.getElementById("map-toggle-btn");
+            if (btn) btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+        }
+
+        function onVpnPowerClick() {
+            var hero = document.getElementById("vpn-hero");
+            var devSel = document.getElementById("device-select");
+            if (!devSel || !devSel.value) {
+                App.toast("Pilih device dulu", true);
+                return;
+            }
+            if (hero && hero.classList.contains("is-on")) {
+                if (typeof Device !== "undefined" && Device.deactivate) {
+                    Device.deactivate(devSel.value);
+                }
+            } else {
+                if (typeof Device !== "undefined" && Device.activateSelected) {
+                    Device.activateSelected();
+                }
+            }
+        }
+
+        function toggleSection(sectionId, event) {
+            if (event) event.stopPropagation();
+            var el = document.getElementById(sectionId);
+            if (!el) return;
+            el.classList.toggle("collapsed");
+            try {
+                var key = "ggeo_section_" + sectionId;
+                localStorage.setItem(
+                    key, el.classList.contains("collapsed") ? "0" : "1");
+            } catch (e) {}
+        }
+        // Restore state on page load
+        (function() {
+            ["presets-panel", "history-panel"].forEach(function(id) {
+                try {
+                    var key = "ggeo_section_" + id;
+                    var saved = localStorage.getItem(key);
+                    if (saved === "1") {
+                        var el = document.getElementById(id);
+                        if (el) el.classList.remove("collapsed");
+                    }
+                } catch (e) {}
+            });
+        })();
+
+        function toggleUserMenu(force) {
+            var dd = document.getElementById("user-menu-dropdown");
+            var btn = document.getElementById("avatar-btn");
+            if (!dd || !btn) return;
+            var open = typeof force === "boolean" ? force : dd.hidden;
+            dd.hidden = !open;
+            btn.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+        document.addEventListener("click", function(e) {
+            var menu = document.getElementById("user-menu");
+            if (menu && !menu.contains(e.target)) toggleUserMenu(false);
+        });
+
+        // Account modal
+        function showAccountModal() {
+            document.getElementById("account-modal").style.display = "flex";
+        }
+        function hideAccountModal() {
+            document.getElementById("account-modal").style.display = "none";
+            document.getElementById("cur-pass").value = "";
+            document.getElementById("new-pass").value = "";
+            document.getElementById("confirm-pass").value = "";
+            document.getElementById("pass-error").textContent = "";
+        }
+        async function changePassword() {
+            var errEl = document.getElementById("pass-error");
+            try {
+                await App.api("PUT", "/api/user/password", {
+                    current_password: document.getElementById("cur-pass").value,
+                    new_password: document.getElementById("new-pass").value,
+                    confirm_password: document.getElementById("confirm-pass").value,
+                });
+                App.toast("Password changed successfully");
+                hideAccountModal();
+                // Dismiss default password banner
+                var banner = document.getElementById("default-pass-banner");
+                if (banner) banner.style.display = "none";
+            } catch(e) {
+                errEl.textContent = e.message;
+            }
+        }
+
+        // Start SSE for real-time updates
+        Device.initSSE();
+
+        // Mobile sidebar toggle
+        (function() {
+            var sidebar = document.getElementById("sidebar");
+            var peek = document.getElementById("sidebar-peek");
+            if (!peek) return;
+
+            // Tap peek bar to toggle
+            peek.addEventListener("click", function(e) {
+                e.stopPropagation();
+                sidebar.classList.toggle("expanded");
+            });
+
+            // Auto-expand on mobile when page loads
+            if (window.innerWidth <= 768) {
+                setTimeout(function() { sidebar.classList.add("expanded"); }, 500);
+            }
+        })();
+    </script>
+</body>
+</html>

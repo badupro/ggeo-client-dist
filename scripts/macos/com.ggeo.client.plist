@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+GGEO client launchd agent (macOS).
+
+Loads the client automatically when the user logs in. Uses sudo
+wrapper because pytun_pmd3 needs root to bring up utun.
+
+Setup:
+  1. Edit the three paths below:
+       - WorkingDirectory:  absolute path to ggeo-client checkout
+       - ProgramArguments:  replace /Users/YOU/ggeo-client/venv/... with real path
+       - StandardOutPath/ErrorPath: where you want logs to land
+  2. Grant NOPASSWD sudo to the python binary (once, requires admin):
+       echo "$USER ALL=(ALL) NOPASSWD: /Users/YOU/ggeo-client/venv/bin/python" \
+         | sudo tee /etc/sudoers.d/ggeo-client && sudo chmod 440 /etc/sudoers.d/ggeo-client
+  3. Copy plist + load:
+       cp com.ggeo.client.plist ~/Library/LaunchAgents/
+       launchctl load ~/Library/LaunchAgents/com.ggeo.client.plist
+  4. Verify:
+       launchctl list | grep com.ggeo.client
+       tail -f /tmp/ggeo-client.log
+
+Stop / uninstall:
+  launchctl unload ~/Library/LaunchAgents/com.ggeo.client.plist
+  rm ~/Library/LaunchAgents/com.ggeo.client.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ggeo.client</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/sudo</string>
+        <string>-n</string>
+        <string>/Users/YOU/ggeo-client/venv/bin/python</string>
+        <string>run.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/YOU/ggeo-client</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/ggeo-client.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/ggeo-client.err</string>
+</dict>
+</plist>

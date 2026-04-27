@@ -1,0 +1,6 @@
+{
+  "client_id": "uuid-string-from-host-admin",
+  "api_key": "ggeo_{client_uuid}_{random_hex}",
+  "host_url": "https://YOUR-HOST-DOMAIN.example.com",
+  "client_name": "Kantor Medan"
+}

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>GGEO - Login</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=51">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v=51">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=51">
+    <style>
+        :root {
+            --bg-base: #0a0a0f;
+            --bg-surface: #111118;
+            --border: rgba(255,255,255,0.06);
+            --accent: #6366f1;
+            --accent-glow: rgba(99,102,241,0.15);
+            --error: #ef4444;
+            --text-primary: rgba(255,255,255,0.92);
+            --text-secondary: rgba(255,255,255,0.48);
+            --text-muted: rgba(255,255,255,0.24);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-base);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            gap: 24px;
+            -webkit-font-smoothing: antialiased;
+        }
+        .login-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 32px;
+            width: 100%;
+            max-width: 380px;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .logo img {
+            width: 72px;
+            height: 72px;
+            margin-bottom: 12px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(99,102,241,0.25);
+        }
+        .logo h1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .logo .version {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 15px;
+            outline: none;
+            margin-bottom: 16px;
+        }
+        input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        input::placeholder {
+            color: var(--text-muted);
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        button:hover { opacity: 0.85; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        button:active { transform: scale(0.98); }
+        .error {
+            color: var(--error);
+            font-size: 13px;
+            text-align: center;
+            margin-top: 12px;
+            min-height: 18px;
+        }
+        .lang-toggle {
+            display: inline-flex;
+            gap: 2px;
+            align-items: center;
+            padding: 2px;
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            user-select: none;
+        }
+        .lang-toggle-btn {
+            padding: 3px 12px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            border-radius: 999px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .lang-toggle-btn:hover { color: var(--text-primary); opacity: 1; }
+        .lang-toggle-btn.active {
+            background: var(--accent);
+            color: #fff;
+        }
+        .lang-toggle-sep { display: none; }
+
+        /* Footer (GitHub-style) */
+        .login-footer {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            max-width: 440px;
+            text-align: center;
+        }
+        .login-footer .footer-row {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .login-footer a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .login-footer a:hover { color: var(--accent); }
+        .login-footer .footer-sep {
+            color: var(--text-muted);
+            opacity: 0.4;
+        }
+        .login-footer .heart {
+            color: #ef4444;
+            display: inline-block;
+            animation: heart-beat 1.8s ease-in-out infinite;
+        }
+        @keyframes heart-beat {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+        .login-footer .github-icon {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+            vertical-align: middle;
+        }
+        .login-footer .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-size: 10px;
+            font-weight: 500;
+        }
+        @media (max-width: 640px) {
+            .login-footer {
+                flex-direction: column;
+                font-size: 10px;
+                gap: 6px;
+            }
+            .login-footer .footer-row { gap: 6px; }
+            .login-footer .footer-sep-badge { display: none; }
+        }
+    </style>
+    <script src="/static/js/i18n.js?v=51"></script>
+    <script src="/static/js/version-badge.js?v=51"></script>
+</head>
+<body>
+    <div class="login-card">
+        <div class="logo">
+            <img src="/static/logo.png?v=51" alt="GGEO">
+            <h1>GGEO</h1>
+            <div class="version">v1.0</div>
+        </div>
+
+        <form id="login-form" onsubmit="return handleLogin(event)">
+            <label data-i18n="username">Username</label>
+            <input type="text" id="username" data-i18n-placeholder="enter_username" placeholder="Enter username" autocomplete="username" autofocus>
+
+            <label data-i18n="password">Password</label>
+            <input type="password" id="password" data-i18n-placeholder="enter_password" placeholder="Enter password" autocomplete="current-password">
+
+            <button type="submit" id="login-btn" data-i18n="login">Log in</button>
+        </form>
+
+        <div class="error" id="error-msg"></div>
+
+        <div style="text-align:center;margin-top:16px">
+            <span class="lang-toggle">
+                <button class="lang-toggle-btn" data-lang="en" onclick="I18N.toggle('en')">EN</button>
+                <span class="lang-toggle-sep">|</span>
+                <button class="lang-toggle-btn" data-lang="id" onclick="I18N.toggle('id')">ID</button>
+            </span>
+        </div>
+    </div>
+
+    <!-- Author footer -->
+    <footer class="login-footer">
+        <div class="footer-row">
+            <span>Made with <span class="heart">♥</span> by
+                <a href="https://github.com/badupro" target="_blank" rel="noopener">Gpro</a>
+            </span>
+            <span class="footer-sep">·</span>
+            <a href="https://github.com/badupro" target="_blank" rel="noopener" title="GitHub">
+                <svg viewBox="0 0 16 16" class="github-icon"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                badupro
+            </a>
+        </div>
+        <span class="footer-sep footer-sep-badge">·</span>
+        <span class="ai-badge">Assisted by Claude Opus 4.6 &amp; 4.7 (Anthropic)</span>
+        <span class="footer-sep footer-sep-badge">·</span>
+        <span class="footer-nav-links">
+            <a href="/about">About</a>
+            <a href="/faq">FAQ</a>
+            <a href="/terms">Terms</a>
+        </span>
+    </footer>
+
+    <script>
+        // Initialize i18n on load
+        I18N.init();
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            var btn = document.getElementById("login-btn");
+            var errEl = document.getElementById("error-msg");
+            var username = document.getElementById("username").value.trim();
+            var password = document.getElementById("password").value;
+
+            errEl.textContent = "";
+            if (!username || !password) {
+                errEl.textContent = I18N.t("err_required_fields");
+                return false;
+            }
+
+            btn.disabled = true;
+            btn.textContent = I18N.t("logging_in");
+
+            try {
+                var res = await fetch("/api/auth/login", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({username: username, password: password}),
+                });
+                var json = await res.json();
+                if (json.status === "ok") {
+                    var role = json.user && json.user.role;
+                    window.location.href = role === "client_admin" ? "/admin" : "/";
+                } else {
+                    errEl.textContent = json.message || I18N.t("err_login_failed");
+                }
+            } catch (err) {
+                errEl.textContent = I18N.t("err_connection");
+            }
+
+            btn.disabled = false;
+            btn.textContent = I18N.t("login");
+            return false;
+        }
+    </script>
+</body>
+</html>
