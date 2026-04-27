@@ -28,6 +28,3 @@ pillow>=10.0.0
 # Skipped on macOS / Linux via platform marker.
 pywintunx-pmd3>=1.0.2; sys_platform == "win32"
 
-# Stage 6 Fase 6.2 auto-install test marker (TEMP — reverted in same fase)
-colorama
-
