@@ -308,7 +308,6 @@ def step_service_checks() -> None:
 
 def prompt_url() -> str:
     info("Host URL is provided by the GGEO Host operator.")
-    info("Format: https://your-host-domain (no trailing slash).")
     while True:
         url = input("    Host URL: ").strip()
         if not url:
@@ -320,7 +319,7 @@ def prompt_url() -> str:
 
 
 def prompt_api_key() -> str:
-    info("API key is obtained from the host admin panel (Clients > [Add] > copy).")
+    info("API key is provided by the GGEO Host operator.")
     while True:
         key = input("    API key: ").strip()
         if not key:
