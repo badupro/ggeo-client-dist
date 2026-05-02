@@ -414,7 +414,7 @@ def create_admin(host_url: str, api_key: str, username: str, password: str) -> N
         if ask_yes_no("Continue with existing user?", default=True):
             return
         sys.exit(1)
-    fail(f"Host returned non-201 response.")
+    fail("Host returned non-201 response.")
     print(out[-500:])
     sys.exit(1)
 

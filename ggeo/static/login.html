@@ -2,303 +2,297 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>GGEO - Login</title>
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=51">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v=51">
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=51">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GGEO — Sign in</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=155">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v=155">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=155">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=155">
+    <script src="/static/js/i18n.js?v=155"></script>
+    <script src="/static/js/version-badge.js?v=155"></script>
     <style>
-        :root {
-            --bg-base: #0a0a0f;
-            --bg-surface: #111118;
-            --border: rgba(255,255,255,0.06);
-            --accent: #6366f1;
-            --accent-glow: rgba(99,102,241,0.15);
-            --error: #ef4444;
-            --text-primary: rgba(255,255,255,0.92);
-            --text-secondary: rgba(255,255,255,0.48);
-            --text-muted: rgba(255,255,255,0.24);
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg-base);
-            color: var(--text-primary);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            gap: 24px;
-            -webkit-font-smoothing: antialiased;
-        }
-        .login-card {
-            background: rgba(255,255,255,0.03);
-            border: 1px solid var(--border);
-            backdrop-filter: blur(12px);
-            border-radius: 16px;
-            padding: 32px;
-            width: 100%;
-            max-width: 380px;
-        }
-        .logo {
-            text-align: center;
-            margin-bottom: 32px;
-        }
-        .logo img {
-            width: 72px;
-            height: 72px;
-            margin-bottom: 12px;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(99,102,241,0.25);
-        }
-        .logo h1 {
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }
-        .logo .version {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-        label {
-            display: block;
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-bottom: 6px;
-        }
-        input {
-            width: 100%;
-            padding: 12px 14px;
-            background: var(--bg-base);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            color: var(--text-primary);
-            font-size: 15px;
-            outline: none;
-            margin-bottom: 16px;
-        }
-        input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-glow);
-        }
-        input::placeholder {
-            color: var(--text-muted);
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.15s;
-        }
-        button:hover { opacity: 0.85; }
-        button:disabled { opacity: 0.4; cursor: not-allowed; }
-        button:active { transform: scale(0.98); }
-        .error {
-            color: var(--error);
-            font-size: 13px;
-            text-align: center;
-            margin-top: 12px;
-            min-height: 18px;
-        }
-        .lang-toggle {
-            display: inline-flex;
-            gap: 2px;
-            align-items: center;
-            padding: 2px;
-            background: var(--bg-base);
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            user-select: none;
-        }
-        .lang-toggle-btn {
-            padding: 3px 12px;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-            border-radius: 999px;
-            transition: background 0.15s, color 0.15s;
-        }
-        .lang-toggle-btn:hover { color: var(--text-primary); opacity: 1; }
-        .lang-toggle-btn.active {
-            background: var(--accent);
-            color: #fff;
-        }
-        .lang-toggle-sep { display: none; }
-
-        /* Footer (GitHub-style) */
-        .login-footer {
-            font-size: 11px;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            max-width: 440px;
-            text-align: center;
-        }
-        .login-footer .footer-row {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .login-footer a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.15s;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .login-footer a:hover { color: var(--accent); }
-        .login-footer .footer-sep {
-            color: var(--text-muted);
-            opacity: 0.4;
-        }
-        .login-footer .heart {
-            color: #ef4444;
-            display: inline-block;
-            animation: heart-beat 1.8s ease-in-out infinite;
-        }
-        @keyframes heart-beat {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.15); }
-        }
-        .login-footer .github-icon {
-            width: 14px;
-            height: 14px;
-            fill: currentColor;
-            vertical-align: middle;
-        }
-        .login-footer .ai-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 2px 8px;
-            background: rgba(99, 102, 241, 0.08);
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            border-radius: 10px;
-            color: var(--text-secondary);
-            font-size: 10px;
-            font-weight: 500;
-        }
-        @media (max-width: 640px) {
-            .login-footer {
-                flex-direction: column;
-                font-size: 10px;
-                gap: 6px;
-            }
-            .login-footer .footer-row { gap: 6px; }
-            .login-footer .footer-sep-badge { display: none; }
-        }
+        html,body{position:relative}
+        body{display:block}
+        .login{position:relative;min-height:100vh}
+        .err{font-size:12px;color:var(--danger);margin-top:10px;min-height:16px}
     </style>
-    <script src="/static/js/i18n.js?v=51"></script>
-    <script src="/static/js/version-badge.js?v=51"></script>
 </head>
 <body>
-    <div class="login-card">
-        <div class="logo">
-            <img src="/static/logo.png?v=51" alt="GGEO">
-            <h1>GGEO</h1>
-            <div class="version">v1.0</div>
+    <div class="login">
+            <div class="login-left">
+            <div class="real-map" id="mapLogin" aria-hidden="true"></div>
+            <div class="veil"></div>
+            <div class="corner tl">
+                <span class="mono" id="loginLat">LAT  −6.208763°</span><br>
+                <span class="mono" id="loginLon">LON  106.845599°</span><br>
+                <span class="ok">● <span data-i18n="login_corner_signal">SIGNAL LOCK</span></span>
+            </div>
+            <div class="corner tr">
+                <span id="loginCity">JAKARTA · ID</span><br>
+                <span data-i18n="login_corner_zone">ZONE</span>  <span id="loginTz">GMT+07</span>
+            </div>
+            <div class="tagline">
+                <h2>
+                    <span data-i18n="login_tagline_lead">ggeo,</span><br>
+                    <em data-i18n="login_tagline_em">precisely</em>
+                    <span data-i18n="login_tagline_tail">where you need it.</span>
+                </h2>
+                <p data-i18n="login_tagline_sub">Deploy location-anchored device sessions across your fleet. On-prem. Audited. Per-site.</p>
+            </div>
         </div>
 
-        <form id="login-form" onsubmit="return handleLogin(event)">
-            <label data-i18n="username">Username</label>
-            <input type="text" id="username" data-i18n-placeholder="enter_username" placeholder="Enter username" autocomplete="username" autofocus>
+        <div class="login-right">
+            <div class="login-top">
+                <span class="logo">
+                    <img src="/static/logo.png?v=155" alt="GGEO" class="logo-img">
+                    <span class="logo-text">ggeo</span>
+                </span>
+                <span class="lang">
+                    <button type="button" class="lang-toggle-btn" data-lang="en" onclick="I18N.toggle('en')">EN</button>
+                    <button type="button" class="lang-toggle-btn" data-lang="id" onclick="I18N.toggle('id')">ID</button>
+                </span>
+            </div>
 
-            <label data-i18n="password">Password</label>
-            <input type="password" id="password" data-i18n-placeholder="enter_password" placeholder="Enter password" autocomplete="current-password">
+            <div class="login-body">
+                <div class="sig">
+                    <span class="dot on"></span>&nbsp;<span data-i18n="login_ready">READY</span>
+                </div>
+                <h1>
+                    <span data-i18n="login_lead">Sign in to</span>
+                    <em data-i18n="login_lead_em">ggeo</em>
+                </h1>
+                <div class="sub">
+                    <span id="loginClientName">…</span> ·
+                    <span class="mono" id="loginClientHost" style="color:var(--fg)">ggeo-client.local</span>
+                </div>
 
-            <button type="submit" id="login-btn" data-i18n="login">Log in</button>
-        </form>
+                <form id="login-form" onsubmit="return handleLogin(event)" novalidate>
+                    <div class="field">
+                        <span class="label" data-i18n="username">Username</span>
+                        <input class="input" type="text" id="username" data-i18n-placeholder="enter_username" placeholder="Enter username" autocomplete="username" autofocus required>
+                    </div>
+                    <div class="field">
+                        <span class="label" data-i18n="password">Password</span>
+                        <div class="pwd-wrap">
+                            <input class="input" type="password" id="password" data-i18n-placeholder="enter_password" placeholder="Enter password" autocomplete="current-password" required>
+                            <button type="button" class="pwd-toggle" id="pwdToggle" aria-label="Show password" onclick="togglePwd('password', this)">
+                                <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                            </button>
+                        </div>
+                        <div class="caps-hint" id="capsHint" hidden data-i18n="caps_lock_on">Caps Lock is on</div>
+                    </div>
+                    <button type="submit" id="login-btn" class="btn btn-primary"><span data-i18n="sign_in">Sign in</span> &nbsp;→</button>
+                    <div class="err" id="error-msg" role="alert" aria-live="polite"></div>
+                </form>
+            </div>
 
-        <div class="error" id="error-msg"></div>
-
-        <div style="text-align:center;margin-top:16px">
-            <span class="lang-toggle">
-                <button class="lang-toggle-btn" data-lang="en" onclick="I18N.toggle('en')">EN</button>
-                <span class="lang-toggle-sep">|</span>
-                <button class="lang-toggle-btn" data-lang="id" onclick="I18N.toggle('id')">ID</button>
-            </span>
+            <div class="login-foot">
+                <span id="versionBadge">GGEO v—</span>
+                <span>© Gpro · badupro</span>
+            </div>
         </div>
     </div>
 
-    <!-- Author footer -->
-    <footer class="login-footer">
-        <div class="footer-row">
-            <span>Made with <span class="heart">♥</span> by
-                <a href="https://github.com/badupro" target="_blank" rel="noopener">Gpro</a>
-            </span>
-            <span class="footer-sep">·</span>
-            <a href="https://github.com/badupro" target="_blank" rel="noopener" title="GitHub">
-                <svg viewBox="0 0 16 16" class="github-icon"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-                badupro
-            </a>
-        </div>
-        <span class="footer-sep footer-sep-badge">·</span>
-        <span class="ai-badge">Assisted by Claude Opus 4.6 &amp; 4.7 (Anthropic)</span>
-        <span class="footer-sep footer-sep-badge">·</span>
-        <span class="footer-nav-links">
-            <a href="/about">About</a>
-            <a href="/faq">FAQ</a>
-            <a href="/terms">Terms</a>
-        </span>
-    </footer>
-
     <script>
-        // Initialize i18n on load
         I18N.init();
+
+        (function initLoginMap(){
+            var el = document.getElementById('mapLogin');
+            if (!el || typeof L === 'undefined') return;
+
+            var DEFAULT = [-6.2088, 106.8456]; // Jakarta
+            var pinIcon = L.divIcon({
+                className: 'ggeo-pin',
+                html: '<span class="pulse p1"></span><span class="pulse p2"></span><span class="core"></span>',
+                iconSize: [18, 18],
+                iconAnchor: [9, 9],
+            });
+
+            var m, marker;
+            try {
+                m = L.map(el, {
+                    zoomControl: false,
+                    dragging: false,
+                    scrollWheelZoom: false,
+                    doubleClickZoom: false,
+                    boxZoom: false,
+                    keyboard: false,
+                    touchZoom: false,
+                    attributionControl: false,
+                    fadeAnimation: false,
+                });
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 20,
+                }).addTo(m);
+                m.setView(DEFAULT, 13);
+                marker = L.marker(DEFAULT, {icon: pinIcon, interactive: false, keyboard: false}).addTo(m);
+            } catch (e) {
+                return;
+            }
+
+            function setCoords(lat, lon) {
+                var fmt = function(v) {
+                    return (v >= 0 ? '' : '−') + Math.abs(v).toFixed(6) + '°';
+                };
+                var latEl = document.getElementById('loginLat');
+                var lonEl = document.getElementById('loginLon');
+                if (latEl) latEl.textContent = 'LAT  ' + fmt(lat);
+                if (lonEl) lonEl.textContent = 'LON  ' + fmt(lon);
+            }
+
+            function setTimezone() {
+                var offsetMin = -new Date().getTimezoneOffset();
+                var sign = offsetMin >= 0 ? '+' : '-';
+                var hr = Math.floor(Math.abs(offsetMin) / 60);
+                var min = Math.abs(offsetMin) % 60;
+                var hh = (hr < 10 ? '0' : '') + hr;
+                var tz = 'GMT' + sign + hh + (min ? ':' + (min < 10 ? '0' : '') + min : '');
+                var tzEl = document.getElementById('loginTz');
+                if (tzEl) tzEl.textContent = tz;
+            }
+
+            function reverseGeocode(lat, lon) {
+                var url = 'https://nominatim.openstreetmap.org/reverse?lat=' + lat
+                        + '&lon=' + lon + '&format=json&zoom=10';
+                return fetch(url, {headers: {'Accept-Language': 'en'}})
+                    .then(function(r){ return r.ok ? r.json() : null; });
+            }
+
+            function setCity(j) {
+                if (!j || !j.address) return;
+                var a = j.address;
+                var city = a.city || a.town || a.village || a.county || a.state || '';
+                var cc = (a.country_code || '').toUpperCase();
+                if (city) {
+                    var cityEl = document.getElementById('loginCity');
+                    if (cityEl) cityEl.textContent = city.toUpperCase() + (cc ? ' · ' + cc : '');
+                }
+            }
+
+            function moveTo(lat, lon) {
+                if (!m) return;
+                m.flyTo([lat, lon], 13, {duration: 1.4});
+                if (marker) marker.setLatLng([lat, lon]);
+            }
+
+            setCoords(DEFAULT[0], DEFAULT[1]);
+            setTimezone();
+
+            if (!navigator.geolocation) return;
+
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    var lat = pos.coords.latitude;
+                    var lon = pos.coords.longitude;
+                    moveTo(lat, lon);
+                    setCoords(lat, lon);
+                    reverseGeocode(lat, lon).then(setCity).catch(function(){});
+                },
+                function(err) {
+                    var signalEl = document.querySelector('.corner.tl .ok');
+                    if (signalEl && err && err.code === err.PERMISSION_DENIED) {
+                        signalEl.textContent = '○ DEFAULT';
+                        signalEl.style.color = 'var(--fg-mute)';
+                    }
+                },
+                {timeout: 10000, maximumAge: 60000, enableHighAccuracy: false}
+            );
+        })();
+
+        (function fetchClientInfo(){
+            // Subtitle shows: <client_name> · <hostname> (per mockup)
+            document.getElementById('loginClientHost').textContent = window.location.hostname;
+            fetch('/api/auth/client-info', {credentials:'same-origin'})
+                .then(function(r){ return r.ok ? r.json() : null; })
+                .then(function(j){
+                    document.getElementById('loginClientName').textContent =
+                        (j && j.client_name) ? j.client_name : '—';
+                })
+                .catch(function(){
+                    document.getElementById('loginClientName').textContent = '—';
+                });
+        })();
+
+        (function fetchVersion(){
+            fetch('/api/version').then(function(r){return r.ok?r.json():null;})
+                .then(function(j){
+                    if (j && j.version) {
+                        document.getElementById('versionBadge').textContent = 'GGEO v' + j.version;
+                    }
+                })
+                .catch(function(){});
+        })();
+
+        function togglePwd(id, btn) {
+            var inp = document.getElementById(id);
+            if (!inp || !btn) return;
+            var on = btn.querySelector('.eye-on');
+            var off = btn.querySelector('.eye-off');
+            if (inp.type === 'password') {
+                inp.type = 'text';
+                if (on) on.style.display = 'none';
+                if (off) off.style.display = '';
+                btn.setAttribute('aria-label', I18N.t('hide_password', 'Hide password'));
+            } else {
+                inp.type = 'password';
+                if (on) on.style.display = '';
+                if (off) off.style.display = 'none';
+                btn.setAttribute('aria-label', I18N.t('show_password', 'Show password'));
+            }
+        }
+
+        (function setupCaps(){
+            var inp = document.getElementById('password');
+            var hint = document.getElementById('capsHint');
+            if (!inp || !hint) return;
+            var update = function(e) {
+                var on = e.getModifierState && e.getModifierState('CapsLock');
+                hint.hidden = !on;
+            };
+            inp.addEventListener('keydown', update);
+            inp.addEventListener('keyup', update);
+            inp.addEventListener('blur', function(){ hint.hidden = true; });
+        })();
 
         async function handleLogin(e) {
             e.preventDefault();
-            var btn = document.getElementById("login-btn");
-            var errEl = document.getElementById("error-msg");
-            var username = document.getElementById("username").value.trim();
-            var password = document.getElementById("password").value;
+            var btn = document.getElementById('login-btn');
+            var errEl = document.getElementById('error-msg');
+            var username = document.getElementById('username').value.trim();
+            var password = document.getElementById('password').value;
 
-            errEl.textContent = "";
+            errEl.textContent = '';
             if (!username || !password) {
-                errEl.textContent = I18N.t("err_required_fields");
+                errEl.textContent = I18N.t('err_required_fields');
                 return false;
             }
 
             btn.disabled = true;
-            btn.textContent = I18N.t("logging_in");
+            var origLabel = btn.textContent;
+            btn.textContent = I18N.t('signing_in');
 
             try {
-                var res = await fetch("/api/auth/login", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
+                var res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({username: username, password: password}),
                 });
                 var json = await res.json();
-                if (json.status === "ok") {
+                if (json.status === 'ok') {
                     var role = json.user && json.user.role;
-                    window.location.href = role === "client_admin" ? "/admin" : "/";
-                } else {
-                    errEl.textContent = json.message || I18N.t("err_login_failed");
+                    window.location.href = role === 'client_admin' ? '/admin' : '/';
+                    return false;
                 }
+                errEl.textContent = json.message || json.detail || I18N.t('err_login_failed');
             } catch (err) {
-                errEl.textContent = I18N.t("err_connection");
+                errEl.textContent = I18N.t('err_connection');
             }
 
             btn.disabled = false;
-            btn.textContent = I18N.t("login");
+            btn.textContent = origLabel;
             return false;
         }
     </script>

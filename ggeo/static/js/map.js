@@ -1,217 +1,184 @@
-// GGEO map.js — MapLibre GL JS, pin, geocoding, hover coordinates, layer switcher.
-
-var GMap_STYLES = {
-    streetmap: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-    satellite: {
-        version: 8,
-        sources: {
-            "esri-world-imagery": {
-                type: "raster",
-                tiles: [
-                    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                ],
-                tileSize: 256,
-                attribution: "Tiles © Esri, Maxar, Earthstar Geographics"
-            }
-        },
-        layers: [{
-            id: "esri-world-imagery",
-            type: "raster",
-            source: "esri-world-imagery",
-            minzoom: 0,
-            maxzoom: 19
-        }]
-    }
-};
+// GGEO map.js — Leaflet, layer switch, search, target pin, cursor coords.
 
 var GMap = {
     map: null,
     marker: null,
+    homeMarker: null,
+    deviceMarkers: {},
     selectedLat: null,
     selectedLon: null,
     _onSelectCallbacks: [],
-    _currentStyle: "streetmap",
+    _layers: {dark: null, sat: null},
+    _currentLayer: "dark",
 
     init: function(containerId) {
         var self = this;
+        var el = document.getElementById(containerId);
+        if (!el || typeof L === "undefined") return;
 
-        if (typeof maplibregl === "undefined") {
-            document.getElementById(containerId).innerHTML =
-                '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:rgba(255,255,255,0.24);font-size:14px;">Map unavailable offline. Coordinates still work.</div>';
-            return;
-        }
+        self.map = L.map(el, {
+            zoomControl: false,
+            attributionControl: true,
+        }).setView([-6.2088, 106.8456], 5);
 
-        self.map = new maplibregl.Map({
-            container: containerId,
-            style: GMap_STYLES.streetmap,
-            center: [106.8456, -6.2088],
-            zoom: 5,
-        });
-
-        self.map.addControl(new maplibregl.NavigationControl({
-            visualizePitch: true,
-        }), "top-right");
-        var geolocate = new maplibregl.GeolocateControl({
-            positionOptions: { enableHighAccuracy: true, timeout: 8000 },
-            trackUserLocation: false,
-            showUserLocation: true,
-        });
-        self.map.addControl(geolocate, "top-right");
-        geolocate.on("error", function(e) {
-            var msg;
-            if (!e || e.code === 1) {
-                msg = "Izin lokasi ditolak. Aktifkan di Settings > Privacy > Location untuk browser ini.";
-            } else if (e.code === 2) {
-                msg = "Lokasi tidak terdeteksi (butuh GPS atau WiFi known location).";
-            } else if (e.code === 3) {
-                msg = "Timeout menunggu lokasi. Coba lagi atau pindah ke tempat dengan sinyal lebih kuat.";
-            } else {
-                msg = "Lokasi tidak tersedia: " + (e.message || "unknown");
+        self._layers.dark = L.tileLayer(
+            "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+            {
+                maxZoom: 20,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
             }
-            if (typeof App !== "undefined" && App.toast) {
-                App.toast(msg, true);
+        );
+        self._layers.sat = L.tileLayer(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            {
+                maxZoom: 19,
+                attribution: "Tiles &copy; Esri",
             }
-        });
-        self.map.addControl(new maplibregl.FullscreenControl(), "top-right");
-
-        self.map.addControl(new maplibregl.ScaleControl({
-            maxWidth: 120,
-            unit: "metric",
-        }), "bottom-left");
-
-        self.map.addControl(new GMap._LayerToggleControl(), "bottom-right");
+        );
+        self._layers.dark.addTo(self.map);
 
         self.map.on("click", function(e) {
-            var lat = e.lngLat.lat;
-            var lon = e.lngLat.lng;
+            var lat = e.latlng.lat;
+            var lon = e.latlng.lng;
             self.setPin(lat, lon);
             self._fireSelect(lat, lon);
         });
 
         self.map.on("mousemove", function(e) {
-            var el = document.getElementById("map-coords");
-            if (el) {
-                el.textContent = e.lngLat.lat.toFixed(8) + ", " + e.lngLat.lng.toFixed(8);
+            var cur = document.getElementById("cursorCoord");
+            if (cur) {
+                cur.textContent = e.latlng.lat.toFixed(4)
+                    + ", " + e.latlng.lng.toFixed(4);
             }
         });
 
-        self.map.on("style.load", function() {
-            if (self.selectedLat != null && self.selectedLon != null) {
-                self.setPin(self.selectedLat, self.selectedLon);
-            }
+        self.map.on("zoomend", function() {
+            var zEl = document.getElementById("hudZoom");
+            if (zEl) zEl.textContent = "ZOOM " + self.map.getZoom().toFixed(1);
         });
 
-        self.map.on("error", function() {});
+        self._tryGeolocation();
     },
 
-    setStyle: function(name) {
-        if (!this.map || !GMap_STYLES[name]) return;
-        if (name === this._currentStyle) return;
-        this._currentStyle = name;
-        this.map.setStyle(GMap_STYLES[name]);
+    _tryGeolocation: function() {
+        var self = this;
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                var lat = pos.coords.latitude;
+                var lon = pos.coords.longitude;
+                if (self.map && (self.map.getZoom() <= 6)) {
+                    self.map.setView([lat, lon], 13);
+                }
+                if (!self.homeMarker) {
+                    var icon = L.divIcon({
+                        className: "home-pin-wrap",
+                        html: '<div class="home-pin"></div>',
+                        iconSize: [18, 18],
+                        iconAnchor: [9, 9],
+                    });
+                    self.homeMarker = L.marker([lat, lon], {
+                        icon: icon, interactive: false, zIndexOffset: -100,
+                    }).addTo(self.map);
+                }
+            },
+            function() { /* permission denied or timeout — keep default Jakarta center */ },
+            { timeout: 8000, maximumAge: 600000, enableHighAccuracy: false }
+        );
     },
 
-    _LayerToggleControl: function() {
-        this.onAdd = function(map) {
-            var container = document.createElement("div");
-            container.className = "maplibregl-ctrl maplibregl-ctrl-group";
-            var btn = document.createElement("button");
-            btn.className = "map-layer-toggle";
-            btn.type = "button";
-            btn.title = "Toggle satellite";
-            btn.setAttribute("aria-label", "Toggle satellite view");
-            var ICON_GLOBE =
-                '<svg viewBox="0 0 24 24" width="18" height="18"' +
-                ' fill="none" stroke="currentColor" stroke-width="2"' +
-                ' stroke-linecap="round" stroke-linejoin="round">' +
-                '<circle cx="12" cy="12" r="10"/>' +
-                '<line x1="2" y1="12" x2="22" y2="12"/>' +
-                '<path d="M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>' +
-                '</svg>';
-            var ICON_DISH =
-                '<svg viewBox="0 0 24 24" width="18" height="18"' +
-                ' fill="none" stroke="currentColor" stroke-width="2"' +
-                ' stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M4 20h10"/>' +
-                '<path d="M5 20l4-8"/>' +
-                '<path d="M13 20l-4-8"/>' +
-                '<circle cx="15" cy="9" r="3"/>' +
-                '<path d="M19 5l2-2M19 13l2 2"/>' +
-                '</svg>';
-            btn.innerHTML = ICON_GLOBE;
-            btn.addEventListener("click", function() {
-                var nextStyle = GMap._currentStyle === "streetmap"
-                    ? "satellite" : "streetmap";
-                GMap.setStyle(nextStyle);
-                btn.innerHTML = nextStyle === "streetmap" ? ICON_GLOBE : ICON_DISH;
-                btn.title = nextStyle === "streetmap"
-                    ? "Switch to satellite" : "Switch to streetmap";
-            });
-            container.appendChild(btn);
-            this._container = container;
-            return container;
-        };
-        this.onRemove = function() {
-            if (this._container && this._container.parentNode) {
-                this._container.parentNode.removeChild(this._container);
-            }
-        };
+    setLayer: function(name) {
+        if (!this.map || !this._layers[name]) return;
+        if (this._currentLayer === name) return;
+        this.map.removeLayer(this._layers[this._currentLayer]);
+        this._layers[name].addTo(this.map);
+        this._currentLayer = name;
     },
 
     setPin: function(lat, lon) {
-        var self = this;
-        if (!self.map) return;
+        if (!this.map) return;
+        this.selectedLat = lat;
+        this.selectedLon = lon;
+    },
 
-        self.selectedLat = lat;
-        self.selectedLon = lon;
+    setPinActive: function() {},
+    setPinInactive: function() {},
 
-        if (self.marker) {
-            self.marker.remove();
+    setDeviceMarker: function(udid, lat, lon, opts) {
+        if (!this.map || !udid) return;
+        if (lat == null || lon == null || isNaN(lat) || isNaN(lon)) return;
+        opts = opts || {};
+        var state = opts.state || "idle";
+        var name = opts.name || "";
+        var selected = !!opts.selected;
+        var existing = this.deviceMarkers[udid];
+        if (existing) {
+            existing.setLatLng([lat, lon]);
+            var iconEl = existing.getElement();
+            if (iconEl) {
+                iconEl.className = "ggeo-pin " + state + (selected ? " selected" : "");
+                var lbl = iconEl.querySelector(".label");
+                if (lbl) lbl.textContent = name;
+            }
+            return;
         }
-
-        var el = document.createElement("div");
-        el.className = "map-pin";
-
-        self.marker = new maplibregl.Marker({ element: el })
-            .setLngLat([lon, lat])
-            .addTo(self.map);
+        var pinIcon = L.divIcon({
+            className: "ggeo-pin " + state + (selected ? " selected" : ""),
+            html: '<span class="pulse p1"></span><span class="pulse p2"></span>'
+                + '<span class="core"></span>'
+                + (name ? '<span class="label">' + name + '</span>' : ''),
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+        });
+        this.deviceMarkers[udid] = L.marker([lat, lon], {
+            icon: pinIcon, interactive: false,
+        }).addTo(this.map);
     },
 
-    setPinActive: function() {
-        var pin = document.querySelector(".map-pin");
-        if (pin) pin.classList.add("active");
+    removeDeviceMarker: function(udid) {
+        if (this.deviceMarkers[udid]) {
+            this.map.removeLayer(this.deviceMarkers[udid]);
+            delete this.deviceMarkers[udid];
+        }
     },
 
-    setPinInactive: function() {
-        var pin = document.querySelector(".map-pin");
-        if (pin) pin.classList.remove("active");
+    syncDeviceMarkers: function(activeUdids) {
+        var keep = {};
+        (activeUdids || []).forEach(function(u){ keep[u] = true; });
+        var self = this;
+        Object.keys(this.deviceMarkers).forEach(function(udid) {
+            if (!keep[udid]) self.removeDeviceMarker(udid);
+        });
     },
 
     flyTo: function(lat, lon, zoom) {
         if (!this.map) return;
-        this.map.flyTo({
-            center: [lon, lat],
-            zoom: zoom || 15,
-            duration: 1500,
-        });
+        this.map.flyTo([lat, lon], zoom || 18, {duration: 1.2});
     },
 
     onSelect: function(fn) {
         this._onSelectCallbacks.push(fn);
     },
 
-    _fireSelect: function(lat, lon) {
-        this._onSelectCallbacks.forEach(function(fn) { fn(lat, lon); });
+    _fireSelect: function(lat, lon, name) {
+        this._onSelectCallbacks.forEach(function(fn) { fn(lat, lon, name || null); });
+    },
+
+    zoomIn: function() { if (this.map) this.map.zoomIn(); },
+    zoomOut: function() { if (this.map) this.map.zoomOut(); },
+    recenter: function() {
+        if (!this.map) return;
+        if (this.selectedLat != null && this.selectedLon != null) {
+            this.map.flyTo([this.selectedLat, this.selectedLon], 18, {duration: 0.8});
+        }
     },
 
     search: async function(query) {
         if (!query || query.length < 2) return [];
         try {
-            var url = "https://nominatim.openstreetmap.org/search?q=" +
-                encodeURIComponent(query) + "&format=json&limit=5";
-            var res = await fetch(url, {
-                headers: { "Accept-Language": "en" },
-            });
+            var url = "https://nominatim.openstreetmap.org/search?q="
+                + encodeURIComponent(query) + "&format=json&limit=5";
+            var res = await fetch(url, {headers: {"Accept-Language": "en"}});
             var results = await res.json();
             return results.map(function(r) {
                 return {
@@ -220,9 +187,7 @@ var GMap = {
                     lon: parseFloat(r.lon),
                 };
             });
-        } catch (e) {
-            return [];
-        }
+        } catch (e) { return []; }
     },
 
     initSearch: function(inputId, resultsId) {
@@ -230,43 +195,59 @@ var GMap = {
         var input = document.getElementById(inputId);
         var results = document.getElementById(resultsId);
         if (!input || !results) return;
-
         var debounce = null;
-
         input.addEventListener("input", function() {
             clearTimeout(debounce);
             debounce = setTimeout(async function() {
                 var q = input.value.trim();
                 if (q.length < 2) {
-                    results.classList.remove("visible");
+                    results.classList.remove("show");
                     return;
+                }
+                var coordMatch = q.match(/^\s*(-?\d+\.?\d*)\s*[, ]\s*(-?\d+\.?\d*)\s*$/);
+                if (coordMatch) {
+                    var lat = parseFloat(coordMatch[1]);
+                    var lon = parseFloat(coordMatch[2]);
+                    if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                        results.innerHTML = '<div class="sr-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/></svg><span class="sr-name">' + lat.toFixed(6) + ', ' + lon.toFixed(6) + '<div class="sr-sub">Coordinates</div></span></div>';
+                        results.classList.add("show");
+                        results.firstChild.addEventListener("click", function() {
+                            self.setPin(lat, lon);
+                            self.flyTo(lat, lon);
+                            self._fireSelect(lat, lon);
+                            results.classList.remove("show");
+                            input.value = "";
+                        });
+                        return;
+                    }
                 }
                 var items = await self.search(q);
                 if (items.length === 0) {
-                    results.classList.remove("visible");
+                    results.innerHTML = '<div class="sr-empty">No matches</div>';
+                    results.classList.add("show");
                     return;
                 }
                 results.innerHTML = "";
                 items.forEach(function(item) {
+                    var shortName = item.name.split(",")[0];
                     var div = document.createElement("div");
-                    div.className = "search-result-item";
-                    div.textContent = item.name;
+                    div.className = "sr-item";
+                    div.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/></svg><span class="sr-name">' + shortName + '<div class="sr-sub">' + item.name + '</div></span><span class="sr-coord">' + item.lat.toFixed(4) + ', ' + item.lon.toFixed(4) + '</span>';
                     div.addEventListener("click", function() {
                         self.setPin(item.lat, item.lon);
                         self.flyTo(item.lat, item.lon);
-                        self._fireSelect(item.lat, item.lon);
-                        results.classList.remove("visible");
+                        self._fireSelect(item.lat, item.lon, shortName);
+                        results.classList.remove("show");
                         input.value = "";
                     });
                     results.appendChild(div);
                 });
-                results.classList.add("visible");
+                results.classList.add("show");
             }, 400);
         });
-
         document.addEventListener("click", function(e) {
             if (!input.contains(e.target) && !results.contains(e.target)) {
-                results.classList.remove("visible");
+                results.classList.remove("show");
             }
         });
     },

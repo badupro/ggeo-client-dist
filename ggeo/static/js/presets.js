@@ -1,11 +1,9 @@
-// GGEO presets.js — user's saved location presets (free users only).
+// GGEO presets.js — saved location presets (free users only).
 
 var Presets = {
     list: [],
 
-    init: function() {
-        this.load();
-    },
+    init: function() { this.load(); },
 
     load: async function() {
         try {
@@ -13,49 +11,56 @@ var Presets = {
             this.list = data;
             this.render();
         } catch (e) {
-            var panel = document.getElementById("presets-panel");
+            var panel = document.getElementById("presetsBlock");
             if (panel) panel.style.display = "none";
         }
     },
 
     render: function() {
-        var container = document.getElementById("presets-list");
+        var container = document.getElementById("presetsList");
+        var count = document.getElementById("presetsCount");
+        var panel = document.getElementById("presetsBlock");
         if (!container) return;
+        if (count) count.textContent = this.list.length;
+        if (panel) panel.style.display = this.list.length === 0 ? "none" : "block";
         if (this.list.length === 0) {
-            container.innerHTML = '<div class="empty-state" style="padding:10px;font-size:12px">No presets saved</div>';
+            container.innerHTML = "";
             return;
         }
         var html = "";
+        var self = this;
         this.list.forEach(function(p) {
-            html += '<div class="preset-item">' +
-                '<div class="preset-info">' +
-                  '<div class="preset-name">' + p.name + '</div>' +
-                  '<div class="preset-coords">' + p.latitude.toFixed(4) + ", " + p.longitude.toFixed(4) + '</div>' +
-                '</div>' +
-                '<div class="preset-actions">' +
-                  '<button class="btn btn-outline btn-sm" onclick="Presets.use(' + p.id + ')">Use</button>' +
-                  '<button class="btn btn-ghost btn-sm" onclick="Presets.remove(' + p.id + ', \'' + p.name.replace(/'/g, "\\'") + '\')" title="Delete">&times;</button>' +
-                '</div>' +
-                '</div>';
+            var safeName = String(p.name).replace(/'/g, "\\'");
+            html += '<div class="preset" onclick="Presets.use(' + p.id + ')">'
+                + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9 12 2"/></svg>'
+                + '<div>'
+                  + '<div class="pname">' + escapePresetHtml(p.name) + '</div>'
+                  + '<div class="pcoord">' + p.latitude.toFixed(5) + ', ' + p.longitude.toFixed(5) + '</div>'
+                + '</div>'
+                + '<button class="rescan-btn" onclick="event.stopPropagation();Presets.remove(' + p.id + ',\'' + safeName + '\')" title="Delete" style="opacity:.6">×</button>'
+                + '</div>';
         });
         container.innerHTML = html;
     },
 
     use: function(id) {
-        var preset = this.list.find(function(p) { return p.id === id; });
-        if (!preset) return;
-        document.getElementById("lat-input").value = preset.latitude;
-        document.getElementById("lon-input").value = preset.longitude;
+        var p = this.list.find(function(x) { return x.id === id; });
+        if (!p) return;
+        var lat = document.getElementById("latInput");
+        var lon = document.getElementById("lonInput");
+        if (lat) lat.value = p.latitude;
+        if (lon) lon.value = p.longitude;
         if (typeof GMap !== "undefined" && GMap.setPin) {
-            GMap.setPin(preset.latitude, preset.longitude);
-            GMap.flyTo(preset.latitude, preset.longitude);
+            GMap.setPin(p.latitude, p.longitude);
+            GMap.flyTo(p.latitude, p.longitude);
         }
-        App.toast("Loaded preset: " + preset.name);
+        if (typeof updateAssignFromInputs === "function") updateAssignFromInputs();
+        App.toast((typeof I18N !== "undefined" ? I18N.t("toast_loaded") : "Loaded") + ": " + p.name);
     },
 
     save: async function() {
-        var lat = parseFloat(document.getElementById("lat-input").value);
-        var lon = parseFloat(document.getElementById("lon-input").value);
+        var lat = parseFloat(document.getElementById("latInput").value);
+        var lon = parseFloat(document.getElementById("lonInput").value);
         if (isNaN(lat) || isNaN(lon)) {
             App.toast("Invalid coordinates", true);
             return;
@@ -71,7 +76,9 @@ var Presets = {
     },
 
     remove: async function(id, name) {
-        if (!(await App.confirm("Hapus preset '" + name + "'?", {title:"Hapus Preset", okText:"Hapus"}))) return;
+        var ok = await App.confirm("Delete preset '" + name + "'?",
+            {title: "Delete preset", okText: "Delete"});
+        if (!ok) return;
         try {
             await App.api("DELETE", "/api/presets/" + id);
             App.toast("Deleted");
@@ -79,5 +86,9 @@ var Presets = {
             if (typeof History !== "undefined") History.load();
         } catch (e) { App.toast(e.message, true); }
     },
-
 };
+
+function escapePresetHtml(str) {
+    return String(str || "").replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}

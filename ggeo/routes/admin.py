@@ -11,13 +11,18 @@ from pymobiledevice3.exceptions import AlreadyMountedError
 from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.services.mobile_image_mounter import auto_mount
 
-from ggeo.config import AUTO_MOUNT_TIMEOUT
+from ggeo.config import AUTO_MOUNT_TIMEOUT, LOG_FILE
 from ggeo.session import require_client_admin, require_user
 
 router = APIRouter(tags=["admin"])
 logger = logging.getLogger("ggeo.routes.admin")
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+LOG_PATH = PROJECT_ROOT / LOG_FILE
+
+LOG_TAIL_DEFAULT = 200
+LOG_TAIL_MAX = 5000
 
 
 def _agent(request: Request):
@@ -39,6 +44,10 @@ async def _forward(request: Request, method: str, path: str,
             detail = resp.json().get("detail", resp.text)
         except Exception:
             detail = resp.text
+        logger.warning(
+            "forward %s %s -> %d: %s",
+            method, url, resp.status_code, str(detail)[:500],
+        )
         raise HTTPException(status_code=resp.status_code, detail=detail)
     return resp.json()
 
@@ -93,8 +102,11 @@ async def delete_user(request: Request, user_id: str):
 @router.get("/api/admin/devices")
 async def list_devices(request: Request):
     await require_client_admin(request)
-    host_response = await _forward(request, "GET", "devices")
-    return _envelope(host_response.get("devices", []))
+    # PERF: only 1 forward to host (was gather(devices, users) — 2 forwards).
+    # assigned_users mapping moved to frontend (uses Admin.users cache).
+    devices_resp = await _forward(request, "GET", "devices")
+    devices = devices_resp.get("devices", [])
+    return _envelope(devices)
 
 
 @router.get("/api/admin/devices/scan")
@@ -154,9 +166,16 @@ async def register_device(request: Request):
             except AlreadyMountedError:
                 logger.info("auto_mount already mounted for %s", udid[:12])
             except asyncio.TimeoutError:
-                raise HTTPException(
-                    status_code=500,
-                    detail="auto_mount timeout. Unlock the device and try again.",
+                logger.warning(
+                    "auto_mount timeout for %s during register; "
+                    "continuing without DDI (will retry on GPS activate)",
+                    udid[:12],
+                )
+            except Exception as exc:
+                logger.warning(
+                    "auto_mount failed for %s during register: %s; "
+                    "continuing without DDI",
+                    udid[:12], exc,
                 )
             try:
                 await lockdown.set_value(
@@ -265,6 +284,38 @@ async def admin_login_history(request: Request):
             "per_page": host_resp.get("per_page", 20)}
 
 
+@router.delete("/api/admin/sessions/history/{session_id}")
+async def admin_session_history_delete_one(request: Request, session_id: str):
+    await require_client_admin(request)
+    return _envelope(await _forward(
+        request, "DELETE", f"sessions/history/{session_id}",
+    ))
+
+
+@router.delete("/api/admin/sessions/history")
+async def admin_session_history_delete_all(request: Request):
+    await require_client_admin(request)
+    return _envelope(await _forward(
+        request, "DELETE", "sessions/history",
+    ))
+
+
+@router.delete("/api/admin/login-history/{login_id}")
+async def admin_login_history_delete_one(request: Request, login_id: str):
+    await require_client_admin(request)
+    return _envelope(await _forward(
+        request, "DELETE", f"login-history/{login_id}",
+    ))
+
+
+@router.delete("/api/admin/login-history")
+async def admin_login_history_delete_all(request: Request):
+    await require_client_admin(request)
+    return _envelope(await _forward(
+        request, "DELETE", "login-history",
+    ))
+
+
 # --- Locations -------------------------------------------------------------
 
 
@@ -303,19 +354,40 @@ async def delete_location(request: Request, location_id: str):
 
 @router.get("/api/admin/sessions")
 async def list_active_sessions(request: Request):
-    """Active GPS sessions from the local DeviceManager."""
     await require_client_admin(request)
     mgr = request.app.state.device_manager
+
+    try:
+        locs_resp = await _forward(request, "GET", "locations")
+        locations = locs_resp.get("locations", [])
+    except HTTPException as exc:
+        logger.warning("fetch locations failed: %s", exc.detail)
+        locations = []
+
     sessions = []
     for udid, sess in list(mgr.sessions.items()):
+        lat = getattr(sess, "lat", None)
+        lon = getattr(sess, "lon", None)
+        location_name = None
+        if lat is not None and lon is not None:
+            for loc in locations:
+                loc_lat = loc.get("latitude")
+                loc_lon = loc.get("longitude")
+                if loc_lat is None or loc_lon is None:
+                    continue
+                if (abs(float(loc_lat) - float(lat)) < 1e-5
+                        and abs(float(loc_lon) - float(lon)) < 1e-5):
+                    location_name = loc.get("name")
+                    break
         sessions.append({
             "udid": udid,
             "name": getattr(sess, "name", udid[:12]),
             "status": getattr(sess, "status", "unknown"),
-            "lat": getattr(sess, "lat", None),
-            "lon": getattr(sess, "lon", None),
+            "lat": lat,
+            "lon": lon,
             "is_simulating": getattr(sess, "is_simulating", False),
             "spoof_started_at": getattr(sess, "spoof_started_at", None),
+            "location_name": location_name,
         })
     return _envelope(sessions)
 
@@ -367,3 +439,41 @@ async def host_status(request: Request):
     await require_user(request)
     status = request.app.state.host_status
     return _envelope(status.to_dict())
+
+
+# --- Log viewer -----------------------------------------------------------
+
+
+@router.get("/api/admin/logs")
+async def get_logs(request: Request, tail: int = LOG_TAIL_DEFAULT):
+    await require_client_admin(request)
+    n = max(1, min(int(tail), LOG_TAIL_MAX))
+
+    if not LOG_PATH.is_file():
+        return _envelope({"lines": [], "total": 0, "path": str(LOG_PATH)})
+
+    try:
+        with LOG_PATH.open("r", encoding="utf-8", errors="replace") as f:
+            all_lines = f.readlines()
+        lines = all_lines[-n:] if n < len(all_lines) else all_lines
+        return _envelope({
+            "lines": [line.rstrip("\n") for line in lines],
+            "total": len(all_lines),
+            "path": str(LOG_PATH),
+        })
+    except OSError as exc:
+        logger.warning("log read failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"log read failed: {exc}")
+
+
+@router.delete("/api/admin/logs")
+async def truncate_logs(request: Request):
+    await require_client_admin(request)
+    try:
+        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        LOG_PATH.write_text("", encoding="utf-8")
+        logger.info("log file truncated")
+        return _envelope({"ok": True})
+    except OSError as exc:
+        logger.warning("log truncate failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"log truncate failed: {exc}")

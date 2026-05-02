@@ -139,7 +139,7 @@ var App = {
         var res = await fetch(path, opts);
         var json = await res.json();
         if (json.status !== "ok") {
-            throw new Error(json.message || json.error || "Request failed");
+            throw new Error(json.message || json.error || json.detail || "Request failed");
         }
         return json.data;
     },

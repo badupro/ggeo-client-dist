@@ -2,365 +2,506 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GGEO</title>
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=51">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v=51">
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=51">
-    <link rel="stylesheet" href="/static/css/style.css?v=51">
-    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-    <script src="/static/js/version-badge.js?v=51"></script>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=61">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v=61">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=61">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=155">
+    <script src="/static/js/i18n.js?v=155"></script>
+    <script src="/static/js/version-badge.js?v=155"></script>
 </head>
-<body class="vpn-mode">
-    <div class="app-layout">
-        <!-- Header -->
-        <header class="app-header">
-            <div class="header-left">
-                <img src="/static/logo.png?v=51" alt="GGEO" class="logo-img">
-                <span class="logo">GGEO</span>
-                <span class="version">v1.0</span>
-            </div>
-            <div class="header-right">
-                <span class="view-switcher" id="view-switcher" hidden>
-                    <a class="view-switcher-btn active" href="/" data-i18n="view_user">User</a>
-                    <a class="view-switcher-btn" href="/admin" data-i18n="view_admin">Admin</a>
-                </span>
-                <span class="lang-toggle">
-                    <button class="lang-toggle-btn" data-lang="en" onclick="I18N.toggle('en')">EN</button>
-                    <button class="lang-toggle-btn" data-lang="id" onclick="I18N.toggle('id')">ID</button>
-                </span>
-                <div class="user-menu" id="user-menu">
-                    <button class="avatar-btn" id="avatar-btn" onclick="toggleUserMenu()" aria-expanded="false" aria-label="User menu"><span id="avatar-initial">?</span></button>
-                    <div class="user-menu-dropdown" id="user-menu-dropdown" hidden>
-                        <div class="user-menu-info">
-                            <div class="user-menu-name" id="user-menu-name">--</div>
-                            <div class="user-menu-role" id="user-menu-role">--</div>
-                        </div>
-                        <button class="user-menu-item" onclick="showAccountModal(); toggleUserMenu(false);">
-                            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            <span data-i18n="account">Change Password</span>
-                        </button>
+<body>
+    <div class="dash">
+        <header class="dash-head">
+            <span class="logo">
+                <img src="/static/logo.png?v=61" alt="GGEO" class="logo-img">
+                <span class="logo-text">ggeo</span>
+            </span>
+            <span class="node" id="nodeName">…</span>
+            <span class="spacer"></span>
+            <span class="avatar" id="avatarBtn" onclick="toggleUserMenu()" tabindex="0" role="button" aria-label="User menu" aria-haspopup="menu">
+                <span id="avatarInitial">?</span>
+                <div class="avatar-menu" id="avatarMenu" role="menu" onclick="event.stopPropagation()">
+                    <div class="avatar-menu-info">
+                        <div class="avatar-menu-name" id="avatarMenuName">--</div>
+                        <div class="avatar-menu-role" id="avatarMenuRole">--</div>
+                        <div class="avatar-menu-meta" id="avatarMenuLogin"></div>
+                    </div>
+                    <div class="avatar-menu-section" id="avatarMenuViewRow" hidden>
+                        <span class="avatar-menu-label" data-i18n="view_label">View</span>
+                        <span class="avatar-menu-toggle view-switch" id="viewSwitchMenu">
+                            <span class="active"><a href="/" data-i18n="view_user">User</a></span>
+                            <span><a href="/admin" data-i18n="view_admin">Admin</a></span>
+                        </span>
+                    </div>
+                    <div class="avatar-menu-section">
+                        <span class="avatar-menu-label" data-i18n="lang_label">Language</span>
+                        <span class="avatar-menu-toggle lang">
+                            <button type="button" class="lang-toggle-btn" data-lang="en" onclick="I18N.toggle('en')">EN</button>
+                            <button type="button" class="lang-toggle-btn" data-lang="id" onclick="I18N.toggle('id')">ID</button>
+                        </span>
+                    </div>
+                    <div class="avatar-menu-divider"></div>
+                    <div class="avatar-menu-item" role="menuitem" tabindex="0" onclick="showAccountModal()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                        <span data-i18n="account_menu">Account</span>
+                    </div>
+                    <div class="avatar-menu-item" role="menuitem" tabindex="0" onclick="doLogout()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                        <span data-i18n="logout">Log out</span>
+                    </div>
+                    <div class="avatar-menu-foot">
+                        <span class="version">v2.0.0</span>
+                        <span data-i18n="foot_copy">© Gpro · badupro</span>
                     </div>
                 </div>
-                <button class="icon-btn" onclick="doLogout()" data-i18n-title="logout" title="Log out" aria-label="Log out">
-                    <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-                </button>
-            </div>
+            </span>
         </header>
 
-        <!-- Account Modal -->
-        <div id="account-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;padding:20px;">
-            <div class="card" style="max-width:380px;width:100%;padding:24px;">
-                <div class="section-title" style="margin-bottom:16px" data-i18n="new_password">Change Password</div>
-                <input type="password" class="input" id="cur-pass" data-i18n-placeholder="current_password" placeholder="Current password" style="margin-bottom:8px">
-                <input type="password" class="input" id="new-pass" data-i18n-placeholder="new_password" placeholder="New password (min 8 chars)" style="margin-bottom:8px">
-                <input type="password" class="input" id="confirm-pass" data-i18n-placeholder="confirm_password" placeholder="Confirm new password" style="margin-bottom:12px">
-                <div style="display:flex;gap:8px">
-                    <button class="btn btn-primary" style="flex:1" onclick="changePassword()" data-i18n="save">Save</button>
-                    <button class="btn btn-outline" style="flex:1" onclick="hideAccountModal()" data-i18n="cancel">Cancel</button>
-                </div>
-                <div class="error" id="pass-error" style="color:#ef4444;font-size:12px;margin-top:8px;min-height:16px"></div>
-            </div>
+        <div id="defaultPassBanner" class="warn-banner" hidden data-i18n="banner_default_pass">
+            Default password is active. Change it via Account.
         </div>
 
-        <!-- Default password warning (admin only) -->
-        <div id="default-pass-banner" class="warning-banner" style="display:none" data-i18n="banner_default_pass">
-            Default password aktif. Ganti segera via Account.
-        </div>
-
-        <!-- Locked user message -->
-        <div id="locked-banner" style="display:none;padding:8px 16px;background:rgba(245,158,11,0.1);border-bottom:1px solid rgba(245,158,11,0.2);text-align:center;font-size:13px;color:#f59e0b;" data-i18n="banner_locked">
-            Location controlled by admin
-        </div>
-
-        <!-- Body -->
-        <div class="app-body">
-            <!-- Sidebar -->
-            <aside class="sidebar" id="sidebar">
-                <div class="sidebar-handle"></div>
-                <div class="sidebar-peek" id="sidebar-peek">
-                    <span class="sidebar-peek-label" data-i18n="controls">Controls</span>
-                </div>
-
-                <!-- VPN-style power button -->
-                <div class="vpn-hero" id="vpn-hero">
-                    <button type="button" class="vpn-power-btn" id="vpn-power-btn"
-                            onclick="onVpnPowerClick()" aria-label="Toggle GPS">
-                        <span class="vpn-ring vpn-ring-outer"></span>
-                        <span class="vpn-ring vpn-ring-mid"></span>
-                        <span class="vpn-power-inner">
-                            <svg viewBox="0 0 24 24" class="vpn-power-icon" aria-hidden="true">
-                                <path d="M12 2v10" stroke-width="2.5" stroke-linecap="round"/>
-                                <path d="M5.5 6.5a8 8 0 1 0 13 0" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-                            </svg>
-                        </span>
-                    </button>
-                    <div class="vpn-hero-status" id="vpn-hero-status">Tidak terhubung</div>
-                    <div class="vpn-hero-meta">
-                        <span id="vpn-hero-device">--</span>
-                        <span class="vpn-sep">&middot;</span>
-                        <span id="vpn-hero-location">--</span>
-                    </div>
-                    <div class="vpn-hero-timer" id="vpn-hero-timer" hidden>00:00:00</div>
-                    <div class="vpn-multi-chip" id="vpn-multi-chip" hidden>0 sesi aktif total</div>
-                </div>
-
-                <!-- Map toggle (mobile only) -->
-                <div class="sidebar-section map-toggle-section" id="map-toggle-section" hidden>
-                    <button type="button" class="btn btn-outline btn-full" id="map-toggle-btn" onclick="toggleMapDrawer()">
-                        <svg viewBox="0 0 24 24" class="map-toggle-icon" aria-hidden="true" width="18" height="18">
-                            <path d="M1 6v16l7-3 8 3 7-3V3l-7 3-8-3-7 3z" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M8 3v17M16 6v17" stroke-width="2" fill="none" stroke-linecap="round"/>
-                        </svg>
-                        <span id="map-toggle-label">Buka Peta</span>
-                    </button>
-                </div>
-
-                <!-- Device Panel -->
-                <div class="sidebar-section">
-                    <div class="section-title" data-i18n="device">Device</div>
-                    <div id="bonjour-silent-hint" hidden style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:8px;margin-bottom:8px;font-size:0.9em;color:#856404"></div>
-                    <div id="wifi-unreachable-hint" hidden style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:8px;margin-bottom:8px;font-size:0.9em;color:#856404"></div>
-                    <div id="scan-progress" class="scan-progress" hidden></div>
-                    <div style="display:flex;gap:6px;margin-bottom:12px">
-                        <select id="device-select" disabled style="flex:1;margin-bottom:0">
-                            <option value="" data-i18n="scanning">Scanning...</option>
-                        </select>
-                        <button class="btn btn-outline btn-sm" id="scan-btn" onclick="Device.scan()" style="flex-shrink:0" data-i18n="scan">Scan</button>
+        <div class="dash-body">
+            <aside class="dash-side">
+                <div class="side-scroll">
+                    <div class="side-label" style="display:flex;justify-content:space-between;align-items:center">
+                        <span data-i18n="devices">Devices</span>
+                        <button class="rescan-btn" id="rescanBtn" onclick="Device.scan()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 5v4h-4"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 19v-4h4"/></svg>
+                            <span data-i18n="rescan">Rescan</span>
+                        </button>
                     </div>
 
-                    <!-- Location dropdown (locked: assigned only, free: all globals as quick-pick) -->
-                    <div id="location-picker-wrap" style="display:none">
-                        <div class="section-title" id="location-picker-label" data-i18n="location">Location</div>
-                        <select class="input" id="location-picker" onchange="handleLocationPick()" style="margin-bottom:8px">
-                            <option value="">-- select --</option>
-                        </select>
-                        <div id="current-location-name" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;display:none"></div>
-                    </div>
-
-                    <div class="section-title" id="coords-label" data-i18n="coordinates">Coordinates</div>
-                    <div class="input-group" style="margin-bottom:6px">
-                        <input type="text" class="input" id="lat-input" data-i18n-placeholder="th_latitude" placeholder="Latitude" value="-6.2088">
-                        <input type="text" class="input" id="lon-input" data-i18n-placeholder="th_longitude" placeholder="Longitude" value="106.8456">
-                    </div>
-                    <button class="btn btn-ghost btn-full btn-sm" id="save-preset-btn" onclick="Presets.save()" style="margin-bottom:10px;display:none" data-i18n="save_preset">+ Save as preset</button>
-                    <button class="btn btn-success btn-full" id="activate-btn" onclick="Device.activateSelected()" disabled style="margin-bottom:6px" data-i18n="activate">Activate</button>
-                    <button class="btn btn-primary btn-full btn-sm" id="apply-btn" onclick="applyLocation()" style="display:none">Apply Location</button>
-                    <button class="btn btn-outline btn-full btn-sm" id="goto-btn" onclick="gotoActiveLocation()" style="margin-top:6px;display:none">Go to active location</button>
-                </div>
-
-                <!-- Active Sessions -->
-                <div class="sidebar-section">
-                    <div class="section-title"><span data-i18n="active_sessions">Active Sessions</span> (<span id="active-count">0</span>)</div>
-                    <div id="sessions-container">
-                        <div class="empty-state" data-i18n="empty_sessions">No active sessions</div>
-                    </div>
-                </div>
-
-                <!-- Presets (free users only) — collapsible, default collapsed -->
-                <div class="sidebar-section collapsible collapsed" id="presets-panel" style="display:none">
-                    <div class="section-title section-title-toggle" onclick="toggleSection('presets-panel', event)">
-                        <span class="section-title-label" data-i18n="presets">Presets</span>
-                        <div class="section-title-right">
-                            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); Presets.save()" style="padding:2px 8px;font-size:10px" data-i18n="save">+ Save</button>
-                            <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                    <div class="scan-empty" id="scanEmpty">
+                        <div class="scan-mini">
+                            <span class="scan-spin" id="scanSpin" style="display:none"></span>
+                            <span class="scan-head" id="scanHead" data-i18n="scanning_devices">Scanning…</span>
+                        </div>
+                        <div class="scan-progress" id="scanProgress" style="display:none">
+                            <div class="bar" id="scanBar"></div>
                         </div>
                     </div>
-                    <div class="sidebar-section-body">
-                        <div id="presets-list"></div>
-                    </div>
-                </div>
 
-                <!-- History — collapsible, default collapsed -->
-                <div class="sidebar-section collapsible collapsed" id="history-panel" style="display:none">
-                    <div class="section-title section-title-toggle" onclick="toggleSection('history-panel', event)">
-                        <span class="section-title-label" data-i18n="history">History</span>
-                        <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                    <div class="scan-result" id="scanResult" style="display:none">
+                        <span class="sr-label"><span class="sr-dot"></span><span id="scanSummary">0 devices</span></span>
                     </div>
-                    <div class="sidebar-section-body">
-                        <div id="history-list"></div>
-                        <div id="history-pager" class="history-pager" hidden></div>
+
+                    <div class="device-list" id="deviceList" style="display:none"></div>
+
+                    <div id="bonjourSilentHint" class="warn-soft-hint" hidden></div>
+                    <div id="wifiUnreachableHint" class="warn-soft-hint" hidden></div>
+
+                    <div id="assignFree">
+                        <div class="side-label" style="margin-top:18px" data-i18n="assign_location_label">Assign location to selected</div>
+                        <div class="field-row">
+                            <svg class="accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                            <select id="locationPicker" onchange="handleLocationPick()" style="flex:1;background:transparent;color:inherit;border:none;font-size:inherit;font-family:inherit;appearance:none;cursor:pointer;outline:none">
+                                <option value="" data-i18n="select_location">Select location</option>
+                            </select>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="6 9 12 15 18 9"/></svg>
+                        </div>
+                        <div class="coord-grid">
+                            <div class="coord"><div class="label">LAT</div><input id="latInput" class="input" placeholder="—"></div>
+                            <div class="coord"><div class="label">LON</div><input id="lonInput" class="input" placeholder="—"></div>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-bottom:10px">
+                            <button id="savePresetBtn" class="btn btn-sm" style="flex:1" onclick="toggleSaveForm(true)">+ <span data-i18n="save_preset">Save preset</span></button>
+                        </div>
+                        <div class="save-form" id="savePresetForm">
+                            <div class="save-field">
+                                <label data-i18n="preset_name_label">Preset name</label>
+                                <input id="presetName" class="input" type="text" data-i18n-placeholder="preset_name_ph" placeholder="e.g. HQ Floor 4" autocomplete="off">
+                            </div>
+                            <div class="save-coord">Using: <span class="mono" id="presetCoord">--, --</span></div>
+                            <div style="display:flex;gap:6px">
+                                <button class="btn btn-outline btn-sm" id="savePresetCancel" style="flex:1" onclick="toggleSaveForm(false)" data-i18n="cancel">Cancel</button>
+                                <button class="btn btn-primary btn-sm" id="savePresetConfirm" style="flex:1.3" onclick="savePresetConfirm()" data-i18n="save">Save</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="collapse closed" id="presetsBlock" style="display:none">
+                        <div class="collapse-head" onclick="this.parentElement.classList.toggle('closed')">
+                            <span class="side-label" style="margin:0" data-i18n="presets">Presets</span>
+                            <span class="count" id="presetsCount">0</span>
+                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px"><polyline points="6 9 12 15 18 9"/></svg>
+                        </div>
+                        <div class="collapse-body" id="presetsList"></div>
                     </div>
                 </div>
             </aside>
 
-            <!-- Map Area -->
-            <main class="map-area" id="map-area">
-                <!-- Close-map FAB (mobile drawer) -->
-                <button type="button" class="map-close-fab" id="map-close-fab" onclick="toggleMapDrawer()" aria-label="Tutup Peta">
-                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                        <path d="M6 6l12 12M18 6L6 18" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-                    </svg>
-                </button>
-                <!-- Search -->
-                <div class="search-bar">
-                    <input type="text" class="search-input" id="search-input" data-i18n-placeholder="search_location" placeholder="Search location...">
-                    <div class="search-results" id="search-results"></div>
+            <main class="dash-main">
+                <div class="real-map" id="map"></div>
+                <div class="layer-switch" id="layerSwitch">
+                    <button class="active" data-layer="dark" title="Dark map" aria-label="Dark map" onclick="GMap.setLayer('dark'); setLayerActive('dark')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    </button>
+                    <button data-layer="sat" title="Satellite" aria-label="Satellite" onclick="GMap.setLayer('sat'); setLayerActive('sat')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.5"/></svg>
+                    </button>
                 </div>
 
-                <!-- Map -->
-                <div class="map-container">
-                    <div id="map"></div>
+                <div class="top-row">
+                    <div class="search glass" role="search">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+                        <input class="q" type="text" id="searchInput" data-i18n-placeholder="search_placeholder" placeholder="Search location, paste coordinates…" aria-label="Search location or paste coordinates" autocomplete="off">
+                        <span class="kbd" aria-hidden="true">⌘K</span>
+                        <div class="search-results" id="searchResults"></div>
+                    </div>
+                </div>
+                <div class="compass glass">N</div>
+                <div class="cursor glass" id="cursorCoord">--, --</div>
+                <div class="hud glass" style="position:absolute;right:18px;bottom:62px;z-index:400">
+                    <span id="hudZoom">ZOOM 5.0</span>
+                    <span class="ok" id="hudStatus">● MAP</span>
                 </div>
 
-                <!-- Map overlay — hover coords -->
-                <div class="map-overlay">
-                    <div class="map-coords" id="map-coords">--, --</div>
+                <div class="bottom-row" id="bottomRow" style="display:none">
+                    <div class="target-card glass" id="targetCard">
+                        <div class="target-top">
+                            <span class="n"><span class="dot on"></span><span data-i18n="selected_device">Selected device</span></span>
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <span class="pill accent" id="spoofPill">SPOOF · OFF</span>
+                                <button class="spoof-icon" id="spoofBtn" onclick="onSpoofToggle()" aria-label="Toggle spoof" title="Toggle spoof">
+                                    <svg class="pw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M5.5 7.5a8 8 0 1 0 13 0"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="target-name" id="targetName">--</div>
+                        <div class="target-model" id="targetModel" hidden></div>
+                        <div class="target-coord" hidden>
+                            <span id="targetLoc"></span><span class="target-sep">&nbsp;·&nbsp;</span><span class="mono" id="targetCoord"></span>
+                        </div>
+                        <div class="target-stats">
+                            <div class="stat"><div class="l" data-i18n="label_link">LINK</div><div class="v" id="targetLink">--</div></div>
+                            <div class="stat"><div class="l" id="targetUptimeLabel" data-i18n="label_uptime">UPTIME</div><div class="v mono" id="targetUptime">--</div></div>
+                            <div class="stat" id="targetStatusStat" hidden><div class="l" id="targetStatusLabel" data-i18n="label_status">STATUS</div><div class="v" id="targetStatus">--</div></div>
+                        </div>
+                    </div>
                 </div>
-
+                <div class="map-dock">
+                    <button class="mb" data-mb="in" onclick="GMap.zoomIn()" title="Zoom in" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+                    <button class="mb" data-mb="out" onclick="GMap.zoomOut()" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+                    <div class="sep"></div>
+                    <button class="mb" data-mb="recenter" onclick="GMap.recenter()" title="Re-center" aria-label="Re-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg></button>
+                </div>
             </main>
         </div>
-
-        <!-- Author footer -->
-        <footer class="app-footer">
-            <div class="footer-row">
-                <span>Made with <span class="heart">♥</span> by
-                    <a href="https://github.com/badupro" target="_blank" rel="noopener">Gpro</a>
-                </span>
-                <span class="footer-sep">·</span>
-                <a href="https://github.com/badupro" target="_blank" rel="noopener" title="GitHub">
-                    <svg viewBox="0 0 16 16" class="github-icon"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-                    badupro
-                </a>
-            </div>
-            <span class="footer-sep footer-sep-badge">·</span>
-            <span class="ai-badge">Assisted by Claude Opus 4.6 &amp; 4.7 (Anthropic)</span>
-            <span class="footer-sep footer-sep-badge">·</span>
-            <span class="footer-nav-links">
-                <a href="/about">About</a>
-                <a href="/faq">FAQ</a>
-                <a href="/guide">Guide</a>
-                <a href="/terms">Terms</a>
+        <footer class="app-foot">
+            <span class="meta">
+                <span class="version">GGEO v2.0.0</span>
+                <span class="sep"></span>
+                <span data-i18n="foot_user">Operator console</span>
             </span>
+            <span data-i18n="foot_copy">© Gpro · badupro</span>
         </footer>
+
+        <!-- Mobile bottom navigation (only shown on mobile via CSS) -->
+        <div class="mobile-dash-nav">
+            <button class="active" data-dash-tab="devices" onclick="switchDashMobileTab('devices')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="2" width="12" height="20" rx="2.5"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+                <span data-i18n="devices">Devices</span>
+            </button>
+            <button data-dash-tab="map" onclick="switchDashMobileTab('map')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                <span data-i18n="map_label">Map</span>
+            </button>
+        </div>
+
+        <div id="hostStatusBanner" class="host-banner" hidden></div>
+
+        <div id="accountModal" class="modal-scrim" hidden>
+            <div class="modal-box">
+                <div class="modal-title" data-i18n="account_menu">Account</div>
+                <div class="account-info-grid">
+                    <div class="account-info-row">
+                        <span class="account-info-label" data-i18n="account_username">Username</span>
+                        <span class="account-info-val" id="accountUsername">—</span>
+                    </div>
+                    <div class="account-info-row">
+                        <span class="account-info-label" data-i18n="account_role">Role</span>
+                        <span class="account-info-val" id="accountRole">—</span>
+                    </div>
+                    <div class="account-info-row">
+                        <span class="account-info-label" data-i18n="account_last_login">Last login</span>
+                        <span class="account-info-val" id="accountLastLogin">—</span>
+                    </div>
+                </div>
+                <div class="account-section-title" data-i18n="change_password">Change Password</div>
+                <input type="password" class="input" id="curPass" data-i18n-placeholder="current_password" placeholder="Current password" style="margin-bottom:8px">
+                <input type="password" class="input" id="newPass" data-i18n-placeholder="new_password" placeholder="New password (min 8)" style="margin-bottom:8px">
+                <input type="password" class="input" id="confirmPass" data-i18n-placeholder="confirm_password" placeholder="Confirm new password" style="margin-bottom:12px">
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-primary" style="flex:1" onclick="changePassword()" data-i18n="save">Save</button>
+                    <button class="btn btn-outline" style="flex:1" onclick="hideAccountModal()" data-i18n="cancel">Cancel</button>
+                </div>
+                <div class="err-msg" id="passError"></div>
+            </div>
+        </div>
     </div>
 
-    <!-- Toast container -->
-    <div class="toast-container" id="toast-container"></div>
+    <div class="toast-container" id="toast-container" role="status" aria-live="polite"></div>
 
-    <!-- Scripts -->
-    <script src="/static/js/i18n.js?v=51"></script>
-    <script src="/static/js/app.js?v=51"></script>
-    <script src="/static/js/map.js?v=51"></script>
-    <script src="/static/js/device.js?v=51"></script>
-    <script src="/static/js/presets.js?v=51"></script>
-    <script src="/static/js/history.js?v=51"></script>
+    <script src="/static/js/app.js?v=155"></script>
+    <script src="/static/js/map.js?v=155"></script>
+    <script src="/static/js/device.js?v=155"></script>
+    <script src="/static/js/presets.js?v=155"></script>
+    <script src="/static/js/history.js?v=155"></script>
     <script>
-        // Initialize i18n first (reads localStorage, applies current language)
         I18N.init();
-
-        // Initialize map
         GMap.init("map");
+        GMap.initSearch("searchInput", "searchResults");
 
-        // Initialize search
-        GMap.initSearch("search-input", "search-results");
+        var currentUser = null;
 
-        // When location selected on map, update sidebar inputs
-        GMap.onSelect(function(lat, lon) {
-            document.getElementById("lat-input").value = lat.toFixed(8);
-            document.getElementById("lon-input").value = lon.toFixed(8);
+        GMap.onSelect(function(lat, lon, name) {
+            document.getElementById("latInput").value = lat.toFixed(8);
+            document.getElementById("lonInput").value = lon.toFixed(8);
+            updateAssignFromInputs();
+            if (Device._selectedUdid) {
+                Device.setPreviewLocation(Device._selectedUdid, name || null, lat, lon);
+            }
+            syncLocationPicker(lat, lon);
+            updateSavePresetBtn();
+            var presetNameInput = document.getElementById("presetName");
+            if (name && presetNameInput && !presetNameInput.value.trim()) {
+                presetNameInput.value = name;
+            }
         });
 
-        // Fly map when coordinate inputs change
-        function flyToInputCoords() {
-            var lat = parseFloat(document.getElementById("lat-input").value);
-            var lon = parseFloat(document.getElementById("lon-input").value);
+        function syncLocationPicker(lat, lon) {
+            var picker = document.getElementById("locationPicker");
+            if (!picker) return;
+            var roundKey = function(a, b) {
+                return parseFloat(a).toFixed(5) + "," + parseFloat(b).toFixed(5);
+            };
+            var target = roundKey(lat, lon);
+            for (var i = 0; i < picker.options.length; i++) {
+                var opt = picker.options[i];
+                if (!opt.dataset.lat) continue;
+                if (roundKey(opt.dataset.lat, opt.dataset.lon) === target) {
+                    picker.value = opt.value;
+                    updatePickerActive();
+                    return;
+                }
+            }
+            picker.value = "";
+            updatePickerActive();
+        }
+
+        function updatePickerActive() {
+            var picker = document.getElementById("locationPicker");
+            var fieldRow = picker ? picker.closest(".field-row") : null;
+            if (fieldRow) fieldRow.classList.toggle("has-value", !!(picker && picker.value));
+        }
+
+        function updateSavePresetBtn() {
+            var btn = document.getElementById("savePresetBtn");
+            if (!btn) return;
+            var lat = parseFloat(document.getElementById("latInput").value);
+            var lon = parseFloat(document.getElementById("lonInput").value);
+            var hasCoord = !isNaN(lat) && !isNaN(lon)
+                && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+            btn.disabled = !hasCoord;
+            btn.title = hasCoord ? "" : I18N.t("pick_location_first_short", "Pick a location first");
+        }
+
+        function flyToInputs() {
+            var lat = parseFloat(document.getElementById("latInput").value);
+            var lon = parseFloat(document.getElementById("lonInput").value);
             if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
                 GMap.setPin(lat, lon);
                 GMap.flyTo(lat, lon);
+                if (Device._selectedUdid) {
+                    Device.setPreviewLocation(Device._selectedUdid, null, lat, lon);
+                }
+                syncLocationPicker(lat, lon);
             }
+            updateSavePresetBtn();
         }
-
-        document.getElementById("lat-input").addEventListener("change", flyToInputCoords);
-        document.getElementById("lon-input").addEventListener("change", flyToInputCoords);
-
-        // Auto-fill coordinate paste + fly
+        document.getElementById("latInput").addEventListener("change", flyToInputs);
+        document.getElementById("lonInput").addEventListener("change", flyToInputs);
+        var rerenderForCoordChange = function() {
+            updateSavePresetBtn();
+            if (Device.devices) {
+                Device.renderDeviceList(Device.devices);
+                Device._refreshTargetCard();
+            }
+            var lat = parseFloat(document.getElementById("latInput").value);
+            var lon = parseFloat(document.getElementById("lonInput").value);
+            if (!isNaN(lat) && !isNaN(lon)) syncLocationPicker(lat, lon);
+        };
+        document.getElementById("latInput").addEventListener("input", rerenderForCoordChange);
+        document.getElementById("lonInput").addEventListener("input", rerenderForCoordChange);
         App.setupCoordAutofill(
-            document.getElementById("lat-input"),
-            document.getElementById("lon-input")
+            document.getElementById("latInput"),
+            document.getElementById("lonInput")
         );
-        // After paste, fly to new coords
-        document.getElementById("lat-input").addEventListener("paste", function() {
-            setTimeout(flyToInputCoords, 50);
+        document.getElementById("latInput").addEventListener("paste", function() {
+            setTimeout(flyToInputs, 50);
         });
 
-        // Reset — deactivate selected device
-        function resetLocation() {
-            var select = document.getElementById("device-select");
-            if (select.value) {
-                Device.deactivate(select.value);
-            }
+        function updateAssignFromInputs() {
+            var lat = parseFloat(document.getElementById("latInput").value);
+            var lon = parseFloat(document.getElementById("lonInput").value);
+            updateSavePresetBtn();
+            if (isNaN(lat) || isNaN(lon)) return;
+            var pc = document.getElementById("presetCoord");
+            if (pc) pc.textContent = lat.toFixed(5) + ", " + lon.toFixed(5);
         }
 
-        function gotoActiveLocation() {
-            var lat = parseFloat(document.getElementById("lat-input").value);
-            var lon = parseFloat(document.getElementById("lon-input").value);
-            if (!isNaN(lat) && !isNaN(lon)) {
-                GMap.flyTo(lat, lon);
-            }
+        function setLayerActive(name) {
+            document.querySelectorAll("#layerSwitch button").forEach(function(b) {
+                b.classList.toggle("active", b.dataset.layer === name);
+            });
         }
 
-        // Handle Location picker change (locked: switch current; free: quick-fill)
         async function handleLocationPick() {
-            var sel = document.getElementById("location-picker");
+            var sel = document.getElementById("locationPicker");
+            updatePickerActive();
             if (!sel.value) return;
             var opt = sel.options[sel.selectedIndex];
             var lat = parseFloat(opt.dataset.lat);
             var lon = parseFloat(opt.dataset.lon);
-            var name = opt.dataset.name;
-            document.getElementById("lat-input").value = lat;
-            document.getElementById("lon-input").value = lon;
-            if (typeof GMap !== "undefined" && GMap.setPin) {
-                GMap.setPin(lat, lon);
-                GMap.flyTo(lat, lon);
+            var name = opt.dataset.name || opt.textContent;
+            document.getElementById("latInput").value = lat.toFixed(8);
+            document.getElementById("lonInput").value = lon.toFixed(8);
+            GMap.setPin(lat, lon);
+            GMap.flyTo(lat, lon);
+            updateAssignFromInputs();
+            if (Device._selectedUdid) {
+                Device.setPreviewLocation(Device._selectedUdid, name, lat, lon);
             }
-
-            // Locked user: persist current_location on backend
             if (currentUser && currentUser.location_permission === "locked") {
                 try {
                     await App.api("PUT", "/api/user/current-location", {location_id: parseInt(sel.value)});
-                    var el = document.getElementById("current-location-name");
-                    el.textContent = "Current: " + name;
-                    el.style.display = "block";
-                    App.toast("Current location: " + name);
-                } catch (e) {
-                    App.toast(e.message, true);
-                }
+                    App.toast(I18N.t("toast_loaded") + ": " + name);
+                } catch (e) { App.toast(e.message, true); }
             } else {
-                // Free user: just fill fields
-                App.toast("Loaded: " + name);
+                App.toast(I18N.t("toast_loaded") + ": " + name);
             }
         }
 
-        (function() {
-            var sel = document.getElementById("device-select");
-            if (!sel) return;
-            sel.addEventListener("change", function() {
-                var btn = document.getElementById("activate-btn");
-                if (btn) btn.disabled = !sel.value;
+        function switchDashMobileTab(tab) {
+            // Mobile only: toggle between side panel (Devices) and map (Map).
+            // Desktop CSS already shows both side-by-side; mobile media query
+            // hides .dash-main by default and shows .dash-side full-width.
+            // This function reveals the chosen panel and hides the other.
+            var btns = document.querySelectorAll(".mobile-dash-nav button");
+            btns.forEach(function(b) {
+                b.classList.toggle("active", b.dataset.dashTab === tab);
             });
-        })();
-        Device.scan().then(function() {
-            var select = document.getElementById("device-select");
-            var btn = document.getElementById("activate-btn");
-            if (btn) btn.disabled = !select.value;
-        });
+            document.body.classList.toggle("mobile-tab-map", tab === "map");
+            document.body.classList.toggle("mobile-tab-devices", tab === "devices");
+            // If switching to map, ensure Leaflet recalculates size after panel becomes visible.
+            // Two timers: immediate (after CSS transition) + later (catch slow renders).
+            if (tab === "map" && window.GMap && GMap.map) {
+                setTimeout(function() { GMap.map.invalidateSize(true); }, 50);
+                setTimeout(function() { GMap.map.invalidateSize(true); }, 300);
+            }
+        }
 
-        // Auth — load user info, setup permission UI
-        var currentUser = null;
-        (async function() {
+        function onPowerClick() {
+            if (!Device._selectedUdid) {
+                App.toast(I18N.t("err_pick_device"), true);
+                return;
+            }
+            var sess = Device._lastSessions[Device._selectedUdid];
+            var state = Device._stateOf(sess);
+            if (state === "connecting" || state === "deactivating") return;
+            if (state === "active" || state === "reconnecting") {
+                Device.deactivate(Device._selectedUdid);
+            } else {
+                var lat = parseFloat(document.getElementById("latInput").value);
+                var lon = parseFloat(document.getElementById("lonInput").value);
+                if (isNaN(lat) || isNaN(lon)) {
+                    App.toast(I18N.t("toast_pick_location_first", "Pick a location first"), true);
+                    return;
+                }
+                Device.activate(Device._selectedUdid, lat, lon);
+            }
+        }
+
+        function onSpoofToggle() {
+            onPowerClick();
+        }
+
+        function toggleSaveForm(open) {
+            var f = document.getElementById("savePresetForm");
+            if (!f) return;
+            f.classList.toggle("open", open);
+            if (open) {
+                updateAssignFromInputs();
+                var presetName = document.getElementById("presetName");
+                if (presetName && !presetName.value.trim()) {
+                    var udid = Device._selectedUdid;
+                    var preview = udid ? Device._previewLocationName[udid] : null;
+                    if (preview) presetName.value = preview;
+                }
+                presetName.focus();
+                presetName.select();
+            }
+        }
+
+
+        async function savePresetConfirm() {
+            var name = document.getElementById("presetName").value.trim();
+            var lat = parseFloat(document.getElementById("latInput").value);
+            var lon = parseFloat(document.getElementById("lonInput").value);
+            if (!name) {
+                App.toast(I18N.t("err_preset_name"), true);
+                return;
+            }
+            if (isNaN(lat) || isNaN(lon)) {
+                App.toast(I18N.t("err_invalid_coord"), true);
+                return;
+            }
+            try {
+                await App.api("POST", "/api/presets", {name: name, lat: lat, lon: lon});
+                App.toast(I18N.t("toast_preset_saved") + ": " + name);
+                document.getElementById("presetName").value = "";
+                toggleSaveForm(false);
+                await Presets.load();
+            } catch (e) { App.toast(e.message, true); }
+        }
+
+        (function loadClientName(){
+            fetch("/api/auth/client-info", {credentials: "same-origin"})
+                .then(function(r){ return r.ok ? r.json() : null; })
+                .then(function(j){
+                    var el = document.getElementById("nodeName");
+                    if (el && j && j.client_name) {
+                        el.textContent = j.client_name.toUpperCase();
+                    }
+                });
+        })();
+
+        (async function bootstrap(){
             try {
                 var data = await App.api("GET", "/api/auth/me");
                 currentUser = data;
-                document.getElementById("avatar-initial").textContent =
-                    (data.username || "?").charAt(0);
-                document.getElementById("user-menu-name").textContent = data.username;
-                document.getElementById("user-menu-role").textContent = data.role;
+                document.getElementById("avatarInitial").textContent = (data.username || "?").charAt(0).toUpperCase();
+                document.getElementById("avatarMenuName").textContent = data.username;
+                document.getElementById("avatarMenuRole").textContent = data.role;
+                var loginEl = document.getElementById("avatarMenuLogin");
+                if (loginEl) {
+                    loginEl.textContent = formatLoginAt(data.login_at);
+                }
 
-                var picker = document.getElementById("location-picker");
-                var pickerWrap = document.getElementById("location-picker-wrap");
-                var pickerLabel = document.getElementById("location-picker-label");
+                if (data.role === "client_admin" || data.role === "admin") {
+                    var viewRow = document.getElementById("avatarMenuViewRow");
+                    if (viewRow) viewRow.hidden = false;
+                }
+                if (data.is_default_password === true) {
+                    document.getElementById("defaultPassBanner").hidden = false;
+                }
+
+                var picker = document.getElementById("locationPicker");
                 var assignedLocations = [];
                 var isAdminPicker = data.role === "client_admin"
                     && data.location_permission !== "locked";
@@ -370,176 +511,99 @@
                     } else {
                         assignedLocations = await App.api("GET", "/api/device/locations");
                     }
-                } catch (e) { /* non-fatal, show empty */ }
-
-                var showPicker = data.location_permission === "locked"
-                    || isAdminPicker
-                    || assignedLocations.length > 0;
-                if (showPicker) {
-                    pickerWrap.style.display = "block";
-                    picker.innerHTML = '<option value="">-- pilih lokasi --</option>';
-                    assignedLocations.forEach(function(loc) {
-                        var opt = document.createElement("option");
-                        opt.value = loc.id;
-                        opt.textContent = loc.name;
-                        opt.dataset.lat = loc.latitude;
-                        opt.dataset.lon = loc.longitude;
-                        opt.dataset.name = loc.name;
-                        if (data.global_location_id && loc.id === data.global_location_id) {
-                            opt.selected = true;
-                        }
-                        picker.appendChild(opt);
-                    });
-                    pickerLabel.textContent = data.location_permission === "locked"
-                        ? "Assigned Location"
-                        : (isAdminPicker ? "Lokasi Tersedia" : "Quick Location");
-                    if (data.location_permission === "locked" && assignedLocations.length === 0) {
-                        // Tell the user why the dropdown is empty.
-                        picker.innerHTML =
-                            '<option value="">Belum ada lokasi di-assign oleh admin</option>';
-                        picker.disabled = true;
-                    } else if (isAdminPicker && assignedLocations.length === 0) {
-                        picker.innerHTML =
-                            '<option value="">Belum ada lokasi terdaftar - tambahkan di Admin Panel</option>';
-                        picker.disabled = true;
+                } catch (e) { /* non-fatal */ }
+                picker.innerHTML = '<option value="">' + I18N.t("select_location") + '</option>';
+                var lockedAutoOpt = null;
+                assignedLocations.forEach(function(loc) {
+                    var opt = document.createElement("option");
+                    opt.value = loc.id;
+                    opt.textContent = loc.name;
+                    opt.dataset.lat = loc.latitude;
+                    opt.dataset.lon = loc.longitude;
+                    opt.dataset.name = loc.name;
+                    if (data.location_permission === "locked"
+                        && data.global_location_id
+                        && loc.id === data.global_location_id) {
+                        opt.selected = true;
+                        lockedAutoOpt = opt;
                     }
-                }
+                    picker.appendChild(opt);
+                });
+                updatePickerActive();
 
-                var vpnHeroShow = document.getElementById("vpn-hero");
-                var heroDevice = document.getElementById("vpn-hero-device");
-                var heroLocation = document.getElementById("vpn-hero-location");
-                var latEl = document.getElementById("lat-input");
-                var lonEl = document.getElementById("lon-input");
-                var devSel = document.getElementById("device-select");
-
-                // Pre-fill hero location from picker if it has a preselect.
-                if (heroLocation && picker.selectedOptions[0]
-                    && picker.selectedOptions[0].value) {
-                    heroLocation.textContent = picker.selectedOptions[0].dataset.name
-                        || picker.selectedOptions[0].text;
-                }
                 if (data.location_permission === "locked") {
                     document.body.classList.add("locked-mode");
-                    var lockedBanner = document.getElementById("locked-banner");
-                    if (lockedBanner) lockedBanner.style.display = "block";
-                    var mapEl = document.getElementById("map");
-                    if (mapEl) mapEl.style.display = "none";
-                    var coordsLabel = document.getElementById("coords-label");
-                    if (coordsLabel) coordsLabel.style.display = "none";
-                    if (latEl) latEl.style.display = "none";
-                    if (lonEl) lonEl.style.display = "none";
-                    var searchEl = document.getElementById("search-input");
-                    if (searchEl) { searchEl.disabled = true; searchEl.style.display = "none"; }
-                    if (picker.selectedOptions[0] && picker.selectedOptions[0].dataset.lat) {
-                        latEl.value = picker.selectedOptions[0].dataset.lat;
-                        lonEl.value = picker.selectedOptions[0].dataset.lon;
+                    var savePreset = document.getElementById("savePresetBtn");
+                    if (savePreset) savePreset.style.display = "none";
+                    var latIn = document.getElementById("latInput");
+                    var lonIn = document.getElementById("lonInput");
+                    if (latIn) { latIn.readOnly = true; latIn.classList.add("input-locked"); }
+                    if (lonIn) { lonIn.readOnly = true; lonIn.classList.add("input-locked"); }
+                    if (lockedAutoOpt && lockedAutoOpt.dataset.lat) {
+                        latIn.value = lockedAutoOpt.dataset.lat;
+                        lonIn.value = lockedAutoOpt.dataset.lon;
+                        setTimeout(flyToInputs, 50);
                     }
                 }
 
-                // Sync hero meta on any relevant control change (all roles).
-                var syncHeroDevice = function() {
-                    if (!heroDevice) return;
-                    var opt = devSel && devSel.selectedOptions[0];
-                    heroDevice.textContent = (opt && opt.value)
-                        ? opt.text.split(" (")[0]
-                        : "--";
-                };
-                var syncHeroLocation = function() {
-                    if (!heroLocation) return;
-                    if (picker && picker.value && picker.selectedOptions[0]) {
-                        heroLocation.textContent = picker.selectedOptions[0].dataset.name
-                            || picker.selectedOptions[0].text;
-                        return;
-                    }
-                    if (latEl && lonEl && latEl.value && lonEl.value) {
-                        var lat = parseFloat(latEl.value);
-                        var lon = parseFloat(lonEl.value);
-                        if (!isNaN(lat) && !isNaN(lon)) {
-                            heroLocation.textContent = lat.toFixed(4) + ", " + lon.toFixed(4);
-                            return;
-                        }
-                    }
-                    heroLocation.textContent = "--";
-                };
-                if (devSel) {
-                    devSel.addEventListener("change", syncHeroDevice);
-                    syncHeroDevice();
-                }
-                ["lat-input","lon-input","location-picker"].forEach(function(id) {
-                    var el = document.getElementById(id);
-                    if (el) el.addEventListener("change", syncHeroLocation);
-                });
-                syncHeroLocation();
-
-                if (typeof Device !== "undefined" && Device._onStatusChange) {
-                    Device._onStatusChange(function(isOn, name, summary) {
-                        var hero = document.getElementById("vpn-hero");
-                        var statusTxt = document.getElementById("vpn-hero-status");
-                        var timerEl = document.getElementById("vpn-hero-timer");
-                        var chipEl = document.getElementById("vpn-multi-chip");
-                        if (!hero || !statusTxt) return;
-                        hero.classList.toggle("is-on", !!isOn);
-                        statusTxt.textContent = isOn ? "Terhubung" : "Tidak terhubung";
-                        if (name && heroDevice) heroDevice.textContent = name;
-                        if (chipEl) {
-                            var total = (summary && summary.totalActive) || 0;
-                            if (total > 1) {
-                                chipEl.hidden = false;
-                                chipEl.textContent = total + " sesi aktif total";
-                            } else {
-                                chipEl.hidden = true;
-                            }
-                        }
-                        if (isOn) {
-                            if (timerEl) {
-                                timerEl.hidden = false;
-                                var startAt = Date.now();
-                                if (summary && summary.sessionsByUdid
-                                    && summary.selectedUdid
-                                    && summary.sessionsByUdid[summary.selectedUdid]
-                                    && summary.sessionsByUdid[summary.selectedUdid].spoof_started_at) {
-                                    startAt = summary.sessionsByUdid[summary.selectedUdid].spoof_started_at * 1000;
-                                }
-                                clearInterval(window.__vpnTimer);
-                                window.__vpnTimer = setInterval(function() {
-                                    var sec = Math.max(0, Math.floor((Date.now() - startAt) / 1000));
-                                    var h = String(Math.floor(sec/3600)).padStart(2,"0");
-                                    var m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
-                                    var s = String(sec%60).padStart(2,"0");
-                                    timerEl.textContent = h + ":" + m + ":" + s;
-                                }, 1000);
-                            }
-                        } else {
-                            if (timerEl) timerEl.hidden = true;
-                            clearInterval(window.__vpnTimer);
-                        }
-                    });
-                }
-
-                if (devSel && Device && Device.recomputeSelectedState) {
-                    devSel.addEventListener("change", function() {
-                        Device.recomputeSelectedState();
-                    });
-                }
-
-                // Presets only for free users
                 if (data.location_permission === "free") {
-                    document.getElementById("presets-panel").style.display = "block";
-                    document.getElementById("save-preset-btn").style.display = "block";
+                    document.getElementById("presetsBlock").style.display = "block";
                     Presets.init();
                 }
-                // History for everyone
-                document.getElementById("history-panel").style.display = "block";
-                History.init();
 
-                if (data.role === "client_admin" || data.role === "admin") {
-                    document.getElementById("view-switcher").hidden = false;
-                }
+                Device._onStatusChange(function(isOn, name, summary) {
+                    var spoofPill = document.getElementById("spoofPill");
+                    var spoofBtn = document.getElementById("spoofBtn");
+                    var bottomRow = document.getElementById("bottomRow");
+                    var sess = summary && summary.sessionsByUdid && summary.sessionsByUdid[summary.selectedUdid];
+                    var state = Device._stateOf(sess);
+                    var isReconn = state === "reconnecting";
+                    var isConnecting = state === "connecting";
+                    var isDeact = state === "deactivating";
+                    var isError = state === "error";
 
-                // Default password warning banner (admin only)
-                if (data.is_default_password === true) {
-                    document.getElementById("default-pass-banner").style.display = "block";
-                }
+                    if (spoofPill) {
+                        if (isReconn) {
+                            spoofPill.textContent = I18N.t("status_reconnecting", "Reconnecting").toUpperCase();
+                            spoofPill.className = "pill accent";
+                        } else if (isConnecting) {
+                            spoofPill.textContent = I18N.t("status_connecting", "Connecting").toUpperCase();
+                            spoofPill.className = "pill accent";
+                        } else if (isDeact) {
+                            spoofPill.textContent = I18N.t("status_deactivating", "Stopping").toUpperCase();
+                            spoofPill.className = "pill accent";
+                        } else if (isError) {
+                            spoofPill.textContent = I18N.t("status_error", "Error").toUpperCase();
+                            spoofPill.className = "pill accent";
+                        } else {
+                            spoofPill.textContent = "SPOOF · " + (isOn ? "ON" : "OFF");
+                            spoofPill.className = "pill " + (isOn ? "accent" : "");
+                        }
+                    }
+                    if (spoofBtn) spoofBtn.classList.toggle("on", !!(isOn || isReconn || isConnecting || isDeact));
+                    if (bottomRow && Device._selectedUdid) bottomRow.style.display = "flex";
+
+                    if (isOn && sess && sess.spoof_started_at) {
+                        var startAt = sess.spoof_started_at * 1000;
+                        clearInterval(window.__heroTimer);
+                        window.__heroTimer = setInterval(function() {
+                            var sec = Math.max(0, Math.floor((Date.now() - startAt) / 1000));
+                            var h = String(Math.floor(sec/3600)).padStart(2,"0");
+                            var m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
+                            var ss = String(sec%60).padStart(2,"0");
+                            var up = document.getElementById("targetUptime");
+                            if (up) up.textContent = h + ":" + m + ":" + ss;
+                        }, 1000);
+                    } else {
+                        clearInterval(window.__heroTimer);
+                    }
+                });
+
+                Device._scanToastEnabled = false;
+                Device.scan();
+                Device.initSSE();
+                updatePickerActive();
+                updateSavePresetBtn();
             } catch (e) {
                 window.location.href = "/login";
             }
@@ -550,121 +614,81 @@
             window.location.href = "/login";
         }
 
-        function toggleMapDrawer() {
-            var mapArea = document.getElementById("map-area");
-            if (!mapArea) return;
-            var expanded = mapArea.classList.toggle("expanded");
-            var label = document.getElementById("map-toggle-label");
-            if (label) label.textContent = expanded ? "Tutup Peta" : "Buka Peta";
-            var btn = document.getElementById("map-toggle-btn");
-            if (btn) btn.setAttribute("aria-expanded", expanded ? "true" : "false");
-        }
-
-        function onVpnPowerClick() {
-            var hero = document.getElementById("vpn-hero");
-            var devSel = document.getElementById("device-select");
-            if (!devSel || !devSel.value) {
-                App.toast("Pilih device dulu", true);
-                return;
-            }
-            if (hero && hero.classList.contains("is-on")) {
-                if (typeof Device !== "undefined" && Device.deactivate) {
-                    Device.deactivate(devSel.value);
-                }
-            } else {
-                if (typeof Device !== "undefined" && Device.activateSelected) {
-                    Device.activateSelected();
-                }
-            }
-        }
-
-        function toggleSection(sectionId, event) {
-            if (event) event.stopPropagation();
-            var el = document.getElementById(sectionId);
-            if (!el) return;
-            el.classList.toggle("collapsed");
-            try {
-                var key = "ggeo_section_" + sectionId;
-                localStorage.setItem(
-                    key, el.classList.contains("collapsed") ? "0" : "1");
-            } catch (e) {}
-        }
-        // Restore state on page load
-        (function() {
-            ["presets-panel", "history-panel"].forEach(function(id) {
-                try {
-                    var key = "ggeo_section_" + id;
-                    var saved = localStorage.getItem(key);
-                    if (saved === "1") {
-                        var el = document.getElementById(id);
-                        if (el) el.classList.remove("collapsed");
-                    }
-                } catch (e) {}
-            });
-        })();
-
         function toggleUserMenu(force) {
-            var dd = document.getElementById("user-menu-dropdown");
-            var btn = document.getElementById("avatar-btn");
-            if (!dd || !btn) return;
-            var open = typeof force === "boolean" ? force : dd.hidden;
-            dd.hidden = !open;
-            btn.setAttribute("aria-expanded", open ? "true" : "false");
+            var m = document.getElementById("avatarMenu");
+            if (!m) return;
+            var open = typeof force === "boolean" ? force : !m.classList.contains("show");
+            m.classList.toggle("show", open);
         }
         document.addEventListener("click", function(e) {
-            var menu = document.getElementById("user-menu");
-            if (menu && !menu.contains(e.target)) toggleUserMenu(false);
+            var av = document.getElementById("avatarBtn");
+            if (av && !av.contains(e.target)) toggleUserMenu(false);
         });
 
-        // Account modal
+        function formatLoginAt(ts) {
+            if (!ts) return "";
+            var now = Math.floor(Date.now() / 1000);
+            var diff = Math.max(0, now - ts);
+            var label = I18N.t("login_label", "Login");
+            if (diff < 60) return label + ": " + I18N.t("just_now", "just now");
+            if (diff < 3600) return label + ": " + Math.floor(diff / 60) + I18N.t("min_ago_short", "m ago");
+            if (diff < 86400) return label + ": " + Math.floor(diff / 3600) + I18N.t("hour_ago_short", "h ago");
+            var d = new Date(ts * 1000);
+            var pad = function(n){ return n < 10 ? "0" + n : "" + n; };
+            return label + ": " + d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate())
+                + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+        }
+
         function showAccountModal() {
-            document.getElementById("account-modal").style.display = "flex";
+            var m = document.getElementById("accountModal");
+            if (m) m.hidden = false;
+            toggleUserMenu(false);
+            if (currentUser) {
+                var u = document.getElementById("accountUsername");
+                var r = document.getElementById("accountRole");
+                var l = document.getElementById("accountLastLogin");
+                if (u) u.textContent = currentUser.username || "—";
+                if (r) r.textContent = (currentUser.role || "—").toUpperCase().replace("_", " ");
+                if (l) l.textContent = currentUser.login_at
+                    ? formatLoginAt(currentUser.login_at).replace(/^[^:]+:\s*/, "")
+                    : "—";
+            }
+            setTimeout(function(){
+                var el = document.getElementById("curPass");
+                if (el) el.focus();
+            }, 30);
         }
         function hideAccountModal() {
-            document.getElementById("account-modal").style.display = "none";
-            document.getElementById("cur-pass").value = "";
-            document.getElementById("new-pass").value = "";
-            document.getElementById("confirm-pass").value = "";
-            document.getElementById("pass-error").textContent = "";
+            document.getElementById("accountModal").hidden = true;
+            ["curPass","newPass","confirmPass"].forEach(function(id){
+                var el = document.getElementById(id); if (el) el.value = "";
+            });
+            var err = document.getElementById("passError"); if (err) err.textContent = "";
         }
+        document.addEventListener("keydown", function(e){
+            if (e.key === "Escape") {
+                var m = document.getElementById("accountModal");
+                if (m && !m.hidden) hideAccountModal();
+            }
+        });
+        document.getElementById("accountModal").addEventListener("click", function(e){
+            if (e.target === this) hideAccountModal();
+        });
         async function changePassword() {
-            var errEl = document.getElementById("pass-error");
+            var err = document.getElementById("passError");
             try {
                 await App.api("PUT", "/api/user/password", {
-                    current_password: document.getElementById("cur-pass").value,
-                    new_password: document.getElementById("new-pass").value,
-                    confirm_password: document.getElementById("confirm-pass").value,
+                    current_password: document.getElementById("curPass").value,
+                    new_password: document.getElementById("newPass").value,
+                    confirm_password: document.getElementById("confirmPass").value,
                 });
-                App.toast("Password changed successfully");
+                App.toast(I18N.t("toast_password_changed"));
                 hideAccountModal();
-                // Dismiss default password banner
-                var banner = document.getElementById("default-pass-banner");
-                if (banner) banner.style.display = "none";
+                document.getElementById("defaultPassBanner").hidden = true;
             } catch(e) {
-                errEl.textContent = e.message;
+                err.textContent = e.message;
             }
         }
-
-        // Start SSE for real-time updates
-        Device.initSSE();
-
-        // Mobile sidebar toggle
-        (function() {
-            var sidebar = document.getElementById("sidebar");
-            var peek = document.getElementById("sidebar-peek");
-            if (!peek) return;
-
-            // Tap peek bar to toggle
-            peek.addEventListener("click", function(e) {
-                e.stopPropagation();
-                sidebar.classList.toggle("expanded");
-            });
-
-            // Auto-expand on mobile when page loads
-            if (window.innerWidth <= 768) {
-                setTimeout(function() { sidebar.classList.add("expanded"); }, 500);
-            }
-        })();
     </script>
 </body>
 </html>
