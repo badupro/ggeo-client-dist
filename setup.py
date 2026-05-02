@@ -339,7 +339,7 @@ def validate_with_host(host_url: str, api_key: str) -> dict:
         "import httpx\n"
         f"resp = httpx.post('{host_url}/api/client/validate',"
         f" headers={{'X-API-Key': '{api_key}'}},"
-        " json={'client_version': '2.0.0'}, timeout=30)\n"
+        " json={'client_version': '2.2.0'}, timeout=30)\n"
         "print('STATUS', resp.status_code)\n"
         "print(resp.text)\n"
     )
@@ -463,12 +463,12 @@ def _create_macos_shortcut() -> None:
     py = venv_python()
     helper.write_text(
         "#!/bin/bash\n"
-        "# GGEO v2.0.0 — macOS launcher (invoked by GGEO.app)\n\n"
+        "# GGEO v2.2.0 — macOS launcher (invoked by GGEO.app)\n\n"
         f'cd "{ROOT}" || exit 1\n\n'
         "B=$'\\033[1m'; C=$'\\033[96m'; Y=$'\\033[93m'; D=$'\\033[2m'; R=$'\\033[0m'\n"
         'URL="http://ggeo-client.local:8479/"\n\n'
         'printf "\\n"\n'
-        'printf "  ${B}${C}GGEO Client${R}  ${D}v2.0.0${R}\\n"\n'
+        'printf "  ${B}${C}GGEO Client${R}  ${D}v2.2.0${R}\\n"\n'
         'printf "  ${D}GPS Location Spoofer for iOS — Distributed Build${R}\\n"\n'
         'printf "  ${D}────────────────────────────────────────${R}\\n\\n"\n'
         "if lsof -iTCP:8479 -sTCP:LISTEN >/dev/null 2>&1; then\n"
@@ -497,7 +497,7 @@ def _create_macos_shortcut() -> None:
         '        do script "clear && exec " & quoted form of launcherScript\n'
         "        delay 0.3\n"
         "        try\n"
-        '            set custom title of front window to "GGEO Client v2.0.0"\n'
+        '            set custom title of front window to "GGEO Client v2.2.0"\n'
         "        end try\n"
         "    end tell\n"
         "end run\n"
@@ -535,10 +535,10 @@ def _create_windows_shortcut() -> None:
         "@echo off\n"
         "setlocal\n"
         'cd /d "%~dp0.."\n'
-        "title GGEO Client v2.0.0\n"
+        "title GGEO Client v2.2.0\n"
         "cls\n"
         "echo.\n"
-        "echo   GGEO Client v2.0.0 - Distributed GPS Spoofer\n"
+        "echo   GGEO Client v2.2.0 - Distributed GPS Spoofer\n"
         "echo.\n"
         'start "" /B cmd /C "timeout /t 4 /nobreak >nul && '
         'start http://ggeo-client.local:8479/"\n'
@@ -635,7 +635,7 @@ def step_autostart() -> None:
 
 
 def main() -> None:
-    banner("GGEO Client v2.0.0 — Setup Wizard")
+    banner("GGEO Client v2.2.0 — Setup Wizard")
 
     step(1, 10, "Python version check")
     step_python_version()
