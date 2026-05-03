@@ -5,11 +5,9 @@ import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from ggeo.config import LOG_LEVEL, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT
+from ggeo.config import LOG_LEVEL, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT, PROJECT_ROOT
 
-# Resolve log file path relative to project root (parent of ggeo/)
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_LOG_PATH = _PROJECT_ROOT / LOG_FILE
+_LOG_PATH = PROJECT_ROOT / LOG_FILE
 
 # Ensure data/ directory exists
 os.makedirs(_LOG_PATH.parent, exist_ok=True)

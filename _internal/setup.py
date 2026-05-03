@@ -80,15 +80,6 @@ def _ensure_elevated() -> None:
 
 _ensure_elevated()
 
-
-def _clear_screen() -> None:
-    if sys.stdout.isatty():
-        sys.stdout.write("\x1b[2J\x1b[H")
-        sys.stdout.flush()
-
-
-_clear_screen()
-
 try:
     from ggeo.cli import (
         cyan, cyan_b, green, green_b, yellow, yellow_b, red, red_b,
@@ -100,6 +91,15 @@ except ImportError as e:
     print(f"FATAL: cannot import ggeo.cli ({e})", file=sys.stderr)
     print(f"sys.path: {sys.path[:3]}", file=sys.stderr)
     sys.exit(1)
+
+
+def _clear_screen() -> None:
+    if sys.stdout.isatty():
+        sys.stdout.write("\x1b[2J\x1b[H")
+        sys.stdout.flush()
+
+
+_clear_screen()
 def out(line: str = "") -> None:
     print(line)
 
@@ -311,10 +311,7 @@ def prompt_url() -> str:
 
 def prompt_api_key() -> str:
     while True:
-        try:
-            key = getpass.getpass("          API key    ").strip()
-        except EOFError:
-            sys.exit(1)
+        key = ask("API key   ")
         if not key:
             out("          " + grey("API key is required."))
             continue
@@ -558,15 +555,22 @@ def create_macos_shortcut() -> tuple[bool, str]:
         tf.write(applescript)
         applescript_path = tf.name
 
-    desktop = Path.home() / "Desktop"
+    sudo_user = os.environ.get("SUDO_USER")
+    if sudo_user:
+        try:
+            import pwd
+            pw = pwd.getpwnam(sudo_user)
+            home = Path(pw.pw_dir)
+        except Exception:
+            home = Path.home()
+    else:
+        home = Path.home()
+    desktop = home / "Desktop"
     app_path = desktop / f"{SHORTCUT_LABEL}.app"
     if app_path.exists():
         subprocess.run(["rm", "-rf", str(app_path)], check=False)
     icns = SCRIPTS_DIR / "macos" / "ggeo.icns"
-    cmd = ["osacompile"]
-    if icns.exists():
-        cmd += ["-i", str(icns)]
-    cmd += ["-o", str(app_path), applescript_path]
+    cmd = ["osacompile", "-o", str(app_path), applescript_path]
     res = subprocess.run(cmd, capture_output=True, text=True)
     try:
         os.unlink(applescript_path)
@@ -574,15 +578,25 @@ def create_macos_shortcut() -> tuple[bool, str]:
         pass
     if res.returncode != 0:
         return False, f"osacompile failed: {res.stderr.strip()[:80]}"
-    subprocess.run(["codesign", "--force", "--deep", "-s", "-", str(app_path)],
-                   capture_output=True)
-    try:
-        os.utime(app_path, None)
-    except OSError:
-        pass
+    if icns.exists():
+        applet_icns = app_path / "Contents" / "Resources" / "applet.icns"
+        try:
+            applet_icns.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["cp", str(icns), str(applet_icns)], check=False)
+        except Exception:
+            pass
+    if sudo_user:
+        try:
+            subprocess.run(
+                ["chown", "-R", f"{pw.pw_uid}:{pw.pw_gid}", str(app_path)],
+                capture_output=True,
+            )
+        except Exception:
+            pass
+    subprocess.run(["touch", str(app_path)], capture_output=True)
     if not app_path.exists() or not (app_path / "Contents" / "Info.plist").exists():
         return False, "verification failed"
-    return True, str(app_path.relative_to(Path.home())) if app_path.is_relative_to(Path.home()) else str(app_path)
+    return True, str(app_path.relative_to(home)) if str(app_path).startswith(str(home)) else str(app_path)
 
 
 def create_windows_shortcut() -> tuple[bool, str]:
@@ -790,10 +804,22 @@ def remove_old_autostart(items: list[Path | str]) -> int:
 
 
 def install_autostart_macos() -> tuple[bool, str]:
-    plist_path = Path.home() / "Library" / "LaunchAgents" / f"{AUTOSTART_LABEL}.plist"
+    sudo_user = os.environ.get("SUDO_USER")
+    if sudo_user:
+        try:
+            import pwd
+            pw = pwd.getpwnam(sudo_user)
+            home = Path(pw.pw_dir)
+        except Exception:
+            home = Path.home()
+    else:
+        home = Path.home()
+    plist_path = home / "Library" / "LaunchAgents" / f"{AUTOSTART_LABEL}.plist"
     plist_path.parent.mkdir(parents=True, exist_ok=True)
     py = venv_python()
     tray_py = ROOT / "tray.py"
+    data_dir = ROOT / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
     plist_path.write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
@@ -809,19 +835,29 @@ def install_autostart_macos() -> tuple[bool, str]:
         f'    <key>WorkingDirectory</key><string>{ROOT}</string>\n'
         '    <key>RunAtLoad</key><true/>\n'
         '    <key>KeepAlive</key><false/>\n'
-        f'    <key>StandardOutPath</key><string>{ROOT / "data" / "tray.stdout.log"}</string>\n'
-        f'    <key>StandardErrorPath</key><string>{ROOT / "data" / "tray.stderr.log"}</string>\n'
+        f'    <key>StandardOutPath</key><string>{data_dir / "tray.stdout.log"}</string>\n'
+        f'    <key>StandardErrorPath</key><string>{data_dir / "tray.stderr.log"}</string>\n'
         '</dict>\n'
         '</plist>\n'
     )
-    res = subprocess.run(["launchctl", "load", str(plist_path)],
-                         capture_output=True, text=True)
+    if sudo_user:
+        try:
+            subprocess.run(["chown", f"{pw.pw_uid}:{pw.pw_gid}", str(plist_path)],
+                           capture_output=True)
+        except Exception:
+            pass
+        load_cmd = ["sudo", "-u", sudo_user, "launchctl",
+                    "bootstrap", f"gui/{pw.pw_uid}", str(plist_path)]
+    else:
+        load_cmd = ["launchctl", "bootstrap",
+                    f"gui/{os.getuid()}", str(plist_path)]
+    res = subprocess.run(load_cmd, capture_output=True, text=True)
     if res.returncode != 0:
-        return False, f"launchctl load failed: {res.stderr.strip()[:60]}"
-    check = subprocess.run(["launchctl", "list", AUTOSTART_LABEL],
-                           capture_output=True, text=True)
-    if check.returncode != 0:
-        return False, "launchctl list verify failed"
+        fallback_cmd = (["sudo", "-u", sudo_user] if sudo_user else []) + \
+            ["launchctl", "load", str(plist_path)]
+        res = subprocess.run(fallback_cmd, capture_output=True, text=True)
+        if res.returncode != 0:
+            return False, f"launchctl failed: {res.stderr.strip()[:60]}"
     return True, AUTOSTART_LABEL
 
 
