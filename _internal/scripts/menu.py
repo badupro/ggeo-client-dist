@@ -315,18 +315,11 @@ def action_update() -> None:
     step_print(1, total, "Stopping server", ok_inline())
 
     if platform.system() != "Windows":
-        git_dir = ROOT / ".git"
-        if git_dir.exists():
-            try:
-                if git_dir.stat().st_uid != os.getuid():
-                    subprocess.run(
-                        ["sudo", "-n", "chown", "-R",
-                         f"{os.getuid()}:{os.getgid()}", str(git_dir),
-                         str(ROOT)],
-                        capture_output=True,
-                    )
-            except OSError:
-                pass
+        subprocess.run(
+            ["sudo", "-n", "chown", "-R",
+             f"{os.getuid()}:{os.getgid()}", str(ROOT)],
+            capture_output=True,
+        )
 
     res = subprocess.run(
         ["git", "-C", str(ROOT), "fetch", "origin", "main"],
