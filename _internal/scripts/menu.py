@@ -279,7 +279,7 @@ def action_update() -> None:
         return
     print()
 
-    total = 4
+    total = 5
 
     step_print(1, total, "Stopping server")
     kill_port_8484()
@@ -338,6 +338,21 @@ def action_update() -> None:
         input("\n  Press Enter to close...")
         return
     step_overwrite(4, total, "Installing dependencies", ok_inline())
+
+    step_print(5, total, "Refreshing shortcut + autostart")
+    env = os.environ.copy()
+    env["GGEO_AUTO_MODE"] = "1"
+    setup_py = INTERNAL / "setup.py"
+    if platform.system() == "Windows":
+        setup_cmd = ["python", str(setup_py)]
+    else:
+        setup_cmd = ["sudo", "-E", sys.executable, str(setup_py)]
+    rc = subprocess.run(setup_cmd, env=env).returncode
+    if rc != 0:
+        step_overwrite(5, total, "Refreshing shortcut + autostart",
+                       warn_inline(f"setup rc={rc}"))
+    else:
+        step_overwrite(5, total, "Refreshing shortcut + autostart", ok_inline())
 
     new_ver = (ROOT / "VERSION").read_text().strip() if (ROOT / "VERSION").exists() else "?"
     print(render_closing(f"Update complete (v{new_ver})"))

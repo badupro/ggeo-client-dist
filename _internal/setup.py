@@ -28,6 +28,7 @@ if _PY_TREE.is_dir() and (_PY_TREE / "ggeo" / "__init__.py").exists():
 SUPPORTED_PYTHONS = {(3, 11), (3, 12), (3, 13)}
 TOTAL_STEPS = 10
 DEFAULT_PORT = 8484
+AUTO_MODE = os.environ.get("GGEO_AUTO_MODE") == "1"
 
 try:
     VERSION = (ROOT / "VERSION").read_text().strip()
@@ -140,6 +141,10 @@ def out_indent(text: str) -> None:
 
 
 def ask_yes_no(question: str, default: bool = True) -> bool:
+    if AUTO_MODE:
+        out("          " + question + (" [Y/n]" if default else " [y/N]") +
+            f" {DIM}(auto: {'y' if default else 'n'}){RST}")
+        return default
     suffix = " [Y/n]" if default else " [y/N]"
     try:
         ans = input("          " + question + suffix + " ").strip().lower()
@@ -298,7 +303,21 @@ def do_service_checks() -> list[str]:
         return services
     return []
 
+def _existing_config() -> dict | None:
+    if not CLIENT_JSON.exists():
+        return None
+    try:
+        return json.loads(CLIENT_JSON.read_text())
+    except Exception:
+        return None
+
+
 def prompt_url() -> str:
+    if AUTO_MODE:
+        cfg = _existing_config()
+        if cfg and cfg.get("host_url"):
+            out_field("Host URL", cfg["host_url"] + f" {DIM}(reused){RST}")
+            return cfg["host_url"].rstrip("/")
     while True:
         url = ask("Host URL  ")
         if not url:
@@ -310,6 +329,11 @@ def prompt_url() -> str:
 
 
 def prompt_api_key() -> str:
+    if AUTO_MODE:
+        cfg = _existing_config()
+        if cfg and cfg.get("api_key"):
+            out_field("API key", "******** " + DIM + "(reused)" + RST)
+            return cfg["api_key"]
     while True:
         key = ask("API key   ")
         if not key:
@@ -415,6 +439,12 @@ def create_admin(host_url: str, api_key: str, username: str, password: str) -> b
 
 
 def do_admin_account(host_url: str, api_key: str) -> tuple[str, str]:
+    if AUTO_MODE:
+        cfg = _existing_config()
+        if cfg and cfg.get("admin_username"):
+            uname = cfg["admin_username"]
+            out_field("Username", uname + f" {DIM}(reused){RST}")
+            return uname, ""
     while True:
         username = ask("Username  ")
         if not username:
@@ -446,13 +476,15 @@ def do_admin_account(host_url: str, api_key: str) -> tuple[str, str]:
             continue
         return username, pw
 
-def do_save_client_json(host_url: str, api_key: str, validate_data: dict) -> None:
+def do_save_client_json(host_url: str, api_key: str,
+                         validate_data: dict, username: str) -> None:
     DATA_DIR.mkdir(exist_ok=True, parents=True)
     payload = {
         "client_id": validate_data.get("client_id"),
         "api_key": api_key,
         "host_url": host_url,
         "client_name": validate_data.get("client_name") or "",
+        "admin_username": username,
     }
     CLIENT_JSON.write_text(json.dumps(payload, indent=2) + "\n")
     try:
