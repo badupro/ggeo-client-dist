@@ -142,8 +142,9 @@ def out_indent(text: str) -> None:
 
 def ask_yes_no(question: str, default: bool = True) -> bool:
     if AUTO_MODE:
-        out("          " + question + (" [Y/n]" if default else " [y/N]") +
-            f" {DIM}(auto: {'y' if default else 'n'}){RST}")
+        suffix = " [Y/n]" if default else " [y/N]"
+        out("          " + question + suffix + " " +
+            grey(f"(auto: {'y' if default else 'n'})"))
         return default
     suffix = " [Y/n]" if default else " [y/N]"
     try:
@@ -316,7 +317,7 @@ def prompt_url() -> str:
     if AUTO_MODE:
         cfg = _existing_config()
         if cfg and cfg.get("host_url"):
-            out_field("Host URL", cfg["host_url"] + f" {DIM}(reused){RST}")
+            out_field("Host URL", cfg["host_url"] + " " + grey("(reused)"))
             return cfg["host_url"].rstrip("/")
     while True:
         url = ask("Host URL  ")
@@ -332,7 +333,7 @@ def prompt_api_key() -> str:
     if AUTO_MODE:
         cfg = _existing_config()
         if cfg and cfg.get("api_key"):
-            out_field("API key", "******** " + DIM + "(reused)" + RST)
+            out_field("API key", "******** " + grey("(reused)"))
             return cfg["api_key"]
     while True:
         key = ask("API key   ")
@@ -443,7 +444,7 @@ def do_admin_account(host_url: str, api_key: str) -> tuple[str, str]:
         cfg = _existing_config()
         if cfg and cfg.get("admin_username"):
             uname = cfg["admin_username"]
-            out_field("Username", uname + f" {DIM}(reused){RST}")
+            out_field("Username", uname + " " + grey("(reused)"))
             return uname, ""
     while True:
         username = ask("Username  ")
