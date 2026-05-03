@@ -302,7 +302,7 @@ def action_update() -> None:
     if res.returncode != 0:
         err = (res.stderr or res.stdout).strip()[:200]
         step_print(2, total, "Pulling from GitHub", fail_inline("fetch failed"))
-        print(f"\n  {grey(err)}")
+        print(f"\n  {DIM}{err}{RST}")
         input("\n  Press Enter to close...")
         return
     res = subprocess.run(
@@ -312,7 +312,7 @@ def action_update() -> None:
     if res.returncode != 0:
         err = (res.stderr or res.stdout).strip()[:200]
         step_print(2, total, "Pulling from GitHub", fail_inline("reset failed"))
-        print(f"\n  {grey(err)}")
+        print(f"\n  {DIM}{err}{RST}")
         input("\n  Press Enter to close...")
         return
     step_print(2, total, "Pulling from GitHub", ok_inline())
@@ -347,7 +347,7 @@ def action_update() -> None:
     step_print(4, total, "Installing dependencies", ok_inline())
 
     print()
-    print(f"  {grey('Refreshing shortcut + autostart (running setup auto-mode)...')}")
+    print(f"  {DIM}Refreshing shortcut + autostart (running setup auto-mode)...{RST}")
     env = os.environ.copy()
     env["GGEO_AUTO_MODE"] = "1"
     setup_py = INTERNAL / "setup.py"
