@@ -5,6 +5,78 @@ All notable changes to GGEO Client will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.2] — 2026-05-03
+
+Single multi-action launcher + log path fix + tray hybrid.
+
+### Distribution layout
+
+- Top-level dist now shows 6 entries instead of 12: README, CHANGELOG,
+  VERSION, GGeo.command, GGeo.bat, _internal/. The 8 separate launcher
+  files (Setup/View-Log/Update/Uninstall × Mac+Win) consolidated into
+  a single `GGeo.command` (macOS) and `GGeo.bat` (Windows) per OS.
+- Both wrappers exec `_internal/scripts/menu.py` — unified Python
+  launcher that shows ANSI menu with: Setup, Start server, Start
+  server + log viewer, View log only, Update, Uninstall, Quit.
+- Auto-detect default highlighted choice: `[1] Setup` if no client.json
+  yet, `[3] Start + log viewer` after setup is done.
+- Action `[3]` spawns a separate Terminal/PowerShell window with
+  `tail -f` of the log, then runs the server in the current terminal —
+  single click, two-pane monitoring.
+
+### Setup wizard
+
+- Round-1 fixes from user E2E testing on macOS + Windows v2.3.1:
+- W1 (`←[2J←[H` literal printed on Windows): `_clear_screen()` now runs
+  AFTER `ggeo.cli` import so `_enable_windows_vt()` has fired first.
+- W2 (`getpass.getpass()` API key prompt broken on Windows elevated cmd
+  paste): switched API key prompt back to `input()` (visible). Trade-off:
+  visible while typing, but reliable across terminals.
+- L1+L2 (banner showed `./data/ggeo.log` but actual log written to
+  `_internal/py3XX/data/ggeo.log`): logger now uses `config.PROJECT_ROOT`
+  (search-up VERSION marker); banner displays the actual write location.
+
+### Mac autostart
+
+- A3 (launchctl loaded as ROOT context, user could not unload): now uses
+  `launchctl bootstrap gui/<uid>` from the `SUDO_USER` context via
+  `sudo -u SUDO_USER`. Plist file ownership chowned back to user. User
+  can now `launchctl bootout` normally.
+- A1 (tray.py auto-spawned run.py → port conflict with manual shortcut):
+  tray now probes port 8484 first via urlopen — if external server
+  already running, just monitors instead of spawning duplicate.
+- macOS specifically: tray no longer auto-spawns run.py at all (run.py
+  needs sudo for utun tunnel which tray cannot provide). Server starts
+  manually via desktop shortcut. Tray still shows status + provides
+  Stop/Restart/Open Log Window menu items.
+- Windows: auto-spawn behavior preserved (no sudo needed there).
+
+### Mac shortcut icon (M1 retry)
+
+- Removed `osacompile -i` icon flag and post-step `codesign --force`
+  (suspected to be stripping icon resource binding). Now copies
+  `ggeo.icns` directly to `Contents/Resources/applet.icns` after
+  `osacompile`, then `chown -R` to `SUDO_USER` and `touch` for
+  Finder cache invalidation.
+- Shortcut path now resolves to `SUDO_USER`'s Desktop, not root's
+  `/var/root/Desktop`.
+
+### Tray menu
+
+- New items: "Open log window" (live tail in separate Terminal/PowerShell),
+  "Open install folder" (Finder/Explorer at install dir), "Open log file"
+  (static file open in default viewer).
+- "Open GGEO" renamed to "Open in browser" for clarity.
+- Branding: "GGEO" → "GGeo" in menu title (matches v2.3.x branding).
+
+### Windows shortcut Defender mitigation (P1 deferred)
+
+- `_add_windows_defender_allowance()` runs `Add-MpPreference` to add
+  install dir to Defender exclusion + `python.exe` to Controlled Folder
+  Access allowlist (silent fail if Defender unavailable).
+- Post-save 0.5s settle + verify `lnk_path.exists()`. If still missing,
+  return user-actionable recovery instructions.
+
 ## [2.3.1] — 2026-05-03
 
 Wizard polish + dist layout cleanup.
