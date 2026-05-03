@@ -46,11 +46,24 @@ def _hash_file(path: Path) -> str:
         return ""
 
 
+def _git_cmd_prefix() -> list[str]:
+    """Prefix to drop privileges to SUDO_USER if running as root.
+
+    Without this, git as root creates root-owned .git/FETCH_HEAD etc.,
+    which then breaks subsequent user-mode git operations (e.g., menu [5] Update).
+    """
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        sudo_user = os.environ.get("SUDO_USER")
+        if sudo_user:
+            return ["sudo", "-u", sudo_user]
+    return []
+
+
 def _run(args: list[str], timeout: int = 10) -> tuple[int, str, str]:
     """Run a git command, return (rc, stdout, stderr). Never raises."""
     try:
         proc = subprocess.run(
-            ["git", "-C", str(REPO_ROOT)] + args,
+            _git_cmd_prefix() + ["git", "-C", str(REPO_ROOT)] + args,
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -81,10 +94,6 @@ def check_and_update() -> bool:
     """Fetch + fast-forward pull main; re-exec on success. Returns False if skipped."""
     if os.environ.get("GGEO_NO_AUTOUPDATE", "").strip() in ("1", "true", "yes"):
         logger.info("auto-update: disabled via GGEO_NO_AUTOUPDATE")
-        return False
-
-    if hasattr(os, "geteuid") and os.geteuid() == 0:
-        logger.info("auto-update: running as root, skipping (would corrupt .git ownership)")
         return False
 
     if not GIT_DIR.is_dir():
