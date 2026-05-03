@@ -5,6 +5,62 @@ All notable changes to GGEO Client will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] — 2026-05-03
+
+Wizard polish + dist layout cleanup.
+
+### Distribution layout
+
+- All implementation moved into `_internal/` so the dist repo top-level
+  shows only `README.md`, `CHANGELOG.md`, `VERSION`, `Setup-GGeo.command`,
+  `Setup-GGeo.bat`, and `_internal/`. Convention familiar from PyInstaller
+  / Electron / Anaconda.
+- Top-level `Setup-GGeo.command` (macOS) and `Setup-GGeo.bat` (Windows)
+  are thin wrappers that exec `_internal/setup.py` with sudo / admin.
+- `auto_update.py` now uses separate REPO_ROOT (git location) + PROJECT_ROOT
+  (VERSION + requirements location) — fixes auto-install in nested layout.
+
+### Setup wizard
+
+- Step status indicator `✓` aligned at fixed column 40 (was right-aligned
+  to box width — alignment looked uneven across steps).
+- Pre-banner clutter removed: wrapper clears terminal screen, setup.py
+  also clears via ANSI before banner renders.
+- API key input uses `getpass.getpass()` — no longer visible while typing.
+- Step 5 no longer prints Host URL + API key twice.
+- Step 6 validate retries 3× with 30s → 60s → 60s timeout (Render free
+  tier cold starts can take >30s).
+- Mid-wizard errors no longer dump full Python traceback; show one-line
+  message and the log path.
+- macOS sudo run cleans up file ownership (`chown -R` to `SUDO_USER`)
+  on KeyboardInterrupt and on exception (not just success).
+- Step 9/10 step header no longer duplicates with multi-line interactive
+  prompts (was `step_overwrite` issue).
+- Closing card "Start ... on Desktop" split across two lines so long
+  shortcut names don't truncate.
+
+### Run dashboard (`run.py`)
+
+- All log output redirected to `data/ggeo.log` only — terminal stays
+  clean for banner + bottom status line. Fixed missed strip of stderr
+  StreamHandler that was leaking `INFO` log lines to terminal.
+
+### Fixes
+
+- `ggeo/routes/system.py` was missing from build manifest; added —
+  resolves `ModuleNotFoundError: No module named 'ggeo.routes.system'`
+  on first run.
+- `config.py` `PROJECT_ROOT` and `auto_update.py` `REPO_ROOT` now search
+  upward from the file location, so paths resolve correctly whether ggeo/
+  is at top level (source) or nested in `_internal/<py_tag>/` (dist).
+- Windows shortcut creation: pre-flight `Add-MpPreference` adds install
+  dir to Defender exclusion + `python.exe` to Controlled Folder Access
+  allowlist (silent fail if Defender unavailable). Post-save 0.5s
+  settle + verify file exists; if blocked, print user-actionable
+  recovery instructions.
+- Windows shortcut diagnostics: report which method (pywin32 vs VBS)
+  was attempted and the actual error reason on failure.
+
 ## [2.3.0] — 2026-05-03
 
 PyArmor multi-Python ABI build, wizard redesign, port change.

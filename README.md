@@ -1,28 +1,44 @@
-# GGEO
+# GGeo Client
 
-Device management utility.
+Mobile GPS Location Spoofer for iOS / iPadOS.
 
 ## Install
 
-Clone the repo:
+Clone:
 
 ```
 git clone https://github.com/badupro/ggeo-client-dist ggeo-client
 cd ggeo-client
 ```
 
-Then double-click the one-click setup script for your OS:
+Then run the one-click setup wizard:
 
-- **macOS:** `scripts/macos/Setup-GGEO.command`
-- **Windows:** `scripts\windows\Setup-GGEO.bat`
+- **macOS:** double-click `Setup-GGeo.command`
+- **Windows:** right-click `Setup-GGeo.bat` → **Run as administrator**
 
-The wizard installs dependencies and prompts for configuration.
+The wizard creates a virtualenv, installs dependencies, prompts for the host
+URL + API key, creates a desktop shortcut, and optionally enables autostart
+on login.
+
+Requires **Python 3.11, 3.12, or 3.13** (https://python.org/downloads/).
 
 ## Run
 
-After install, double-click the launcher for your OS:
+After setup, double-click the desktop shortcut **GGeo Client v\<version\>**
+created during install.
 
-- **macOS:** `scripts/macos/GGEO.command`
-- **Windows:** `scripts\windows\GGEO.bat`
+The server listens on `http://ggeo-client.local:8484` (mDNS).
 
-Contact administrator for access credentials.
+## Layout
+
+```
+ggeo-client/
+├── README.md
+├── CHANGELOG.md
+├── VERSION
+├── Setup-GGeo.command      ← macOS launcher
+├── Setup-GGeo.bat          ← Windows launcher
+└── _internal/              ← obfuscated runtime + helpers (do not edit)
+```
+
+Contact your administrator for access credentials.
