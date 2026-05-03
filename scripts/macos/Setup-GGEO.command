@@ -5,20 +5,13 @@
 #   1. Python 3.11, 3.12, or 3.13 installed
 #      (brew install python@3.13, or https://python.org)
 #   2. Host URL + API key from the GGeo Host operator
-#
-# Usage:
-#   Double-click Setup-GGEO.command from Finder.
-#   You will be prompted for your password (sudo) so the wizard can
-#   register the autostart agent and create the desktop shortcut.
 
-set -e
+clear
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
 cd "$REPO_DIR"
 
-# Verify Python is installed.
 if ! command -v python3 >/dev/null 2>&1; then
     cat <<'EOF'
 
@@ -32,12 +25,11 @@ EOF
     exit 1
 fi
 
-# setup.py self-elevates with sudo if not already root.
-python3 setup.py
+sudo python3 setup.py
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
     echo ""
-    echo "  Setup exited with code $EXIT_CODE — see messages above."
+    echo "  Setup exited with code $EXIT_CODE."
 fi
 read -p "Press Enter to close..."

@@ -262,15 +262,15 @@ def _status_color(state: str):
 
 # --- Step renderer (compact 1-line) -------------------------------------
 
+STATUS_COLUMN = 40
+
+
 def step_line(num: int, total: int, label: str, status: str = "",
               width: int = DEFAULT_BOX_WIDTH) -> str:
-    """Format a step line: ``  [N/M]  Label                 status``"""
     left = f"  {cyan(f'[{num}/{total}]')}  {label}"
     if not status:
         return left
-    pad = width - _visible_len(left) - _visible_len(status)
-    if pad < 1:
-        pad = 1
+    pad = max(2, STATUS_COLUMN - _visible_len(left))
     return left + " " * pad + status
 
 

@@ -8,11 +8,9 @@ REM      CHECK "Add Python to PATH" during install
 REM   2. iTunes installed (Apple Mobile Device Service + Bonjour)
 REM   3. Host URL + API key from the GGeo Host operator
 REM
-REM Usage:
-REM   Right-click Setup-GGEO.bat -> "Run as administrator".
-REM   Admin is required to register autostart and create the desktop
-REM   shortcut. setup.py refuses to run without elevation.
+REM Right-click this file -> "Run as administrator".
 
+cls
 setlocal enabledelayedexpansion
 
 set "SCRIPT_DIR=%~dp0"
@@ -22,7 +20,6 @@ popd
 
 cd /d "%REPO_DIR%"
 
-REM Check Python presence
 where python >nul 2>nul
 if errorlevel 1 (
     echo.
@@ -34,13 +31,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM setup.py checks admin status; if not elevated, it shows force-close box
-REM and exits with code 1.
 python setup.py
 set EXIT_CODE=%errorlevel%
 
 if not %EXIT_CODE% EQU 0 (
     echo.
-    echo   Setup exited with code %EXIT_CODE% ^(see messages above^).
+    echo   Setup exited with code %EXIT_CODE%.
 )
 pause

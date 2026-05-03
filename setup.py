@@ -80,6 +80,15 @@ def _ensure_elevated() -> None:
 
 _ensure_elevated()
 
+
+def _clear_screen() -> None:
+    if sys.stdout.isatty():
+        sys.stdout.write("\x1b[2J\x1b[H")
+        sys.stdout.flush()
+
+
+_clear_screen()
+
 try:
     from ggeo.cli import (
         cyan, cyan_b, green, green_b, yellow, yellow_b, red, red_b,
@@ -597,6 +606,8 @@ def create_windows_shortcut() -> tuple[bool, str]:
         return False, f"Desktop not found: {desktop}"
     lnk_path = desktop / f"{SHORTCUT_LABEL}.lnk"
 
+    _add_windows_defender_allowance()
+
     method = "vbs"
     last_err = "unknown"
     try:
@@ -620,6 +631,7 @@ def create_windows_shortcut() -> tuple[bool, str]:
                 link.SetIconLocation(str(icon_path), 0)
             link.SetDescription(SHORTCUT_LABEL)
             link.QueryInterface(pythoncom.IID_IPersistFile).Save(str(lnk_path), 0)
+            time.sleep(0.5)  # let Defender real-time scan settle
             try:
                 with open(lnk_path, "r+b") as f:
                     f.seek(0x15)
@@ -630,7 +642,7 @@ def create_windows_shortcut() -> tuple[bool, str]:
                 pass
             if lnk_path.exists():
                 return True, str(lnk_path)
-            last_err = "pywin32 saved but file not found at expected path"
+            last_err = "saved but file missing — likely blocked by Defender Controlled Folder Access or ASR"
         except Exception as e:
             last_err = f"pywin32 error: {type(e).__name__}: {e}"
 
@@ -655,6 +667,8 @@ def create_windows_shortcut() -> tuple[bool, str]:
         )
         if res.returncode != 0:
             last_err = f"cscript rc={res.returncode}: {(res.stderr or res.stdout).strip()[:80]}"
+        else:
+            time.sleep(0.5)
     finally:
         try:
             os.unlink(vbs_file)
@@ -663,7 +677,24 @@ def create_windows_shortcut() -> tuple[bool, str]:
 
     if lnk_path.exists():
         return True, str(lnk_path)
-    return False, f"shortcut not created ({last_err})"
+    return False, f"blocked or not created ({last_err})"
+
+
+def _add_windows_defender_allowance() -> None:
+    if platform.system() != "Windows":
+        return
+    py = str(venv_python())
+    cmds = [
+        ["powershell", "-NoProfile", "-Command",
+         f'Add-MpPreference -ExclusionPath "{ROOT}" -ErrorAction SilentlyContinue'],
+        ["powershell", "-NoProfile", "-Command",
+         f'Add-MpPreference -ControlledFolderAccessAllowedApplications "{py}" -ErrorAction SilentlyContinue'],
+    ]
+    for c in cmds:
+        try:
+            subprocess.run(c, capture_output=True, text=True, timeout=15)
+        except Exception:
+            pass
 
 
 def do_desktop_shortcut() -> str:
@@ -692,6 +723,11 @@ def do_desktop_shortcut() -> str:
 
     if ok:
         return ok_inline(msg)
+    if system == "Windows" and "block" in msg.lower():
+        out("          " + grey("To allow manually:"))
+        out("          " + grey("  Windows Security > Virus & threat protection >"))
+        out("          " + grey("  Manage Controlled folder access > Allow an app:"))
+        out("          " + grey(f"  add {venv_python()}"))
     return fail_inline(msg)
 
 def detect_old_autostart() -> list[Path | str]:
