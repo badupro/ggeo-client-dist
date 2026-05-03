@@ -193,24 +193,28 @@ def action_setup() -> None:
     else:
         rc = subprocess.call(["sudo", sys.executable, str(setup_py)])
     if rc != 0:
-        print(f"\n  Setup exited with code {rc}.")
-    input("  Press Enter to close...")
+        print(f"\n  {fail_inline(f'Setup exited with code {rc}')}")
+    input("\n  Press Enter to close...")
 
 
 def action_start_server() -> None:
     clear_screen()
     py = venv_python()
     if not py.exists():
-        print(f"  {R}venv not found. Run [1] Setup first.{RST}")
-        input("  Press Enter to close...")
+        print(render_banner("Start Server"))
+        print()
+        print(f"  {fail_inline()} venv not found")
+        print(f"    {DIM}Run [1] Setup first to install dependencies.{RST}")
+        input("\n  Press Enter to close...")
         return
     run_py = INTERNAL / "run.py"
     if platform.system() == "Windows":
         rc = subprocess.call([str(py), str(run_py)])
     else:
         rc = subprocess.call(["sudo", str(py), str(run_py)])
-    print(f"\n  Server stopped (exit {rc}).")
-    input("  Press Enter to close...")
+    print()
+    print(f"  {DIM}Server stopped (exit {rc}).{RST}")
+    input("\n  Press Enter to close...")
 
 
 def action_start_with_log() -> None:
@@ -218,17 +222,17 @@ def action_start_with_log() -> None:
     log_path = INTERNAL / "data" / "ggeo.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.touch()
+    self_path = Path(__file__).resolve()
     if platform.system() == "Darwin":
         applescript = (
             f'tell application "Terminal" to do script '
-            f'"clear && echo GGeo Live Log && tail -f \\"{log_path}\\""'
+            f'"python3 \\"{self_path}\\" --view-log"'
         )
         subprocess.Popen(["osascript", "-e", applescript])
     elif platform.system() == "Windows":
         subprocess.Popen(
             ["cmd", "/C", "start", "cmd", "/K",
-             "powershell", "-NoProfile", "-Command",
-             f"Get-Content '{log_path}' -Wait -Tail 50"],
+             "python", str(self_path), "--view-log"],
             shell=False,
         )
     time.sleep(1)
@@ -237,13 +241,21 @@ def action_start_with_log() -> None:
 
 def action_view_log() -> None:
     clear_screen()
+    print(render_banner("Live Log"))
     log_path = INTERNAL / "data" / "ggeo.log"
     if not log_path.exists():
-        print(f"  Log file not found:\n  {log_path}\n")
-        print("  Has the server been started yet?")
-        input("  Press Enter to close...")
+        print()
+        print(f"  {warn_inline()} Log file not found")
+        print(f"    {DIM}{log_path}{RST}")
+        print()
+        print(f"  {DIM}Has the server been started yet?{RST}")
+        input("\n  Press Enter to close...")
         return
-    print(f"  Tailing GGeo log (Ctrl+C to exit):\n  {log_path}\n")
+    print()
+    print(f"  {DIM}{log_path}{RST}")
+    print()
+    print(f"  {DIM}Press Ctrl+C to exit{RST}")
+    print()
     if platform.system() == "Windows":
         subprocess.call(
             ["powershell", "-NoProfile", "-Command",
@@ -430,6 +442,10 @@ def action_uninstall() -> None:
 
 
 def main() -> None:
+    if "--view-log" in sys.argv:
+        action_view_log()
+        return
+
     clear_screen()
     print(banner())
     default = detect_default()
@@ -452,14 +468,14 @@ def main() -> None:
     }
 
     if choice == "q":
-        print("  Bye.")
+        print(f"  {DIM}Bye.{RST}")
         return
 
     fn = actions.get(choice)
     if fn:
         fn()
     else:
-        print(f"  {R}Invalid choice.{RST}")
+        print(f"  {fail_inline('Invalid choice')}")
         time.sleep(1)
 
 
