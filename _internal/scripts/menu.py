@@ -166,7 +166,6 @@ def print_menu(default: str) -> None:
 
 
 def request_sudo_upfront() -> bool:
-    """Cache sudo credentials at wizard start so menu actions never reprompt mid-flow."""
     if platform.system() == "Windows":
         return True
     if os.geteuid() == 0:

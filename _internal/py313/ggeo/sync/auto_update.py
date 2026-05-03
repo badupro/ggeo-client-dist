@@ -47,11 +47,6 @@ def _hash_file(path: Path) -> str:
 
 
 def _git_cmd_prefix() -> list[str]:
-    """Prefix to drop privileges to SUDO_USER if running as root.
-
-    Without this, git as root creates root-owned .git/FETCH_HEAD etc.,
-    which then breaks subsequent user-mode git operations (e.g., menu [5] Update).
-    """
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         sudo_user = os.environ.get("SUDO_USER")
         if sudo_user:
