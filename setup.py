@@ -21,6 +21,16 @@ SCRIPTS_DIR = ROOT / "scripts"
 VENV_DIR = ROOT / "venv"
 
 
+# When running from a built dist/ tree (top-level setup.py), the ggeo package
+# lives inside dist/<py_tag>/ggeo/ rather than at top level. Insert it to
+# sys.path so `from ggeo.autostart import ...` etc. resolve. Source repo runs
+# (where ROOT/ggeo/ exists) skip this branch.
+_PY_TAG = f"py{sys.version_info.major}{sys.version_info.minor}"
+_PY_TREE = ROOT / _PY_TAG
+if _PY_TREE.is_dir() and (_PY_TREE / "ggeo" / "__init__.py").exists():
+    sys.path.insert(0, str(_PY_TREE))
+
+
 def banner(msg: str) -> None:
     print()
     print("=" * 60)
@@ -167,19 +177,18 @@ def run_with_spinner(cmd: list[str], idle_label: str = "working ...",
 
 
 
+SUPPORTED_PYTHONS = {(3, 11), (3, 12), (3, 13)}
+
+
 def step_python_version() -> None:
     v = sys.version_info
-    if v.major != 3 or v.minor < 11:
-        fail(f"Python {v.major}.{v.minor} detected. Need Python 3.11+.")
-        info("Install via https://python.org or 'brew install python@3.11'.")
+    py_tuple = (v.major, v.minor)
+    if py_tuple not in SUPPORTED_PYTHONS:
+        fail(f"Python {v.major}.{v.minor}.{v.micro} not supported.")
+        info("Supported: Python 3.11, 3.12, 3.13.")
+        info("PyArmor binary is built per Python version; install a supported one.")
+        info("Download: https://python.org/downloads/")
         sys.exit(1)
-    if platform.system() == "Windows" and v.minor > 13:
-        warn(
-            f"Python {v.major}.{v.minor} on Windows. pywintunx-pmd3 wheels"
-            " currently top out at 3.13; install may fail."
-        )
-        if not ask_yes_no("Continue anyway?", default=False):
-            sys.exit(1)
     ok(f"Python {v.major}.{v.minor}.{v.micro} detected.")
 
 
