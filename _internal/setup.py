@@ -938,7 +938,9 @@ def install_autostart_windows() -> tuple[bool, str]:
 
 
 def do_autostart() -> str:
-    if not ask_yes_no("Configure autostart on login?", default=False):
+    has_existing = bool(detect_old_autostart())
+    default_yes = has_existing if AUTO_MODE else False
+    if not ask_yes_no("Configure autostart on login?", default=default_yes):
         return grey("skipped")
 
     old = detect_old_autostart()
