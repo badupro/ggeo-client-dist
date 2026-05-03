@@ -1039,7 +1039,7 @@ def main() -> None:
     username, _ = do_admin_account(host_url, api_key)
 
     step(8, "Save data/client.json")
-    do_save_client_json(host_url, api_key, validate_data)
+    do_save_client_json(host_url, api_key, validate_data, username)
     step_overwrite(8, "Save data/client.json", ok_inline())
 
     step(9, "Desktop shortcut")
