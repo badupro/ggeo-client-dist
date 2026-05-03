@@ -286,20 +286,24 @@ def action_update() -> None:
     step_overwrite(1, total, "Stopping server", ok_inline())
 
     step_print(2, total, "Pulling from GitHub")
-    rc = subprocess.run(
-        ["git", "-C", str(ROOT), "fetch", "--quiet", "origin", "main"],
+    res = subprocess.run(
+        ["git", "-C", str(ROOT), "fetch", "origin", "main"],
         capture_output=True, text=True,
-    ).returncode
-    if rc != 0:
-        step_overwrite(2, total, "Pulling from GitHub", fail_inline("git fetch"))
+    )
+    if res.returncode != 0:
+        err = (res.stderr or res.stdout).strip().splitlines()[-1][:80] if (res.stderr or res.stdout).strip() else "rc=%d" % res.returncode
+        step_overwrite(2, total, "Pulling from GitHub", fail_inline(f"fetch: {err}"))
+        print(f"\n  {DIM}{(res.stderr or res.stdout).strip()[:300]}{RST}")
         input("\n  Press Enter to close...")
         return
-    rc = subprocess.run(
-        ["git", "-C", str(ROOT), "reset", "--hard", "--quiet", "origin/main"],
+    res = subprocess.run(
+        ["git", "-C", str(ROOT), "reset", "--hard", "origin/main"],
         capture_output=True, text=True,
-    ).returncode
-    if rc != 0:
-        step_overwrite(2, total, "Pulling from GitHub", fail_inline("git reset"))
+    )
+    if res.returncode != 0:
+        err = (res.stderr or res.stdout).strip().splitlines()[-1][:80] if (res.stderr or res.stdout).strip() else "rc=%d" % res.returncode
+        step_overwrite(2, total, "Pulling from GitHub", fail_inline(f"reset: {err}"))
+        print(f"\n  {DIM}{(res.stderr or res.stdout).strip()[:300]}{RST}")
         input("\n  Press Enter to close...")
         return
     step_overwrite(2, total, "Pulling from GitHub", ok_inline())

@@ -847,24 +847,33 @@ def install_autostart_macos() -> tuple[bool, str]:
         '</dict>\n'
         '</plist>\n'
     )
+    target_uid = pw.pw_uid if sudo_user else os.getuid()
     if sudo_user:
         try:
             subprocess.run(["chown", f"{pw.pw_uid}:{pw.pw_gid}", str(plist_path)],
                            capture_output=True)
         except Exception:
             pass
-        load_cmd = ["sudo", "-u", sudo_user, "launchctl",
-                    "bootstrap", f"gui/{pw.pw_uid}", str(plist_path)]
-    else:
-        load_cmd = ["launchctl", "bootstrap",
-                    f"gui/{os.getuid()}", str(plist_path)]
-    res = subprocess.run(load_cmd, capture_output=True, text=True)
+
+    # First try `launchctl bootout` to clean any stale unit
+    label = AUTOSTART_LABEL
+    subprocess.run(
+        ["launchctl", "bootout", f"gui/{target_uid}/{label}"],
+        capture_output=True,
+    )
+    res = subprocess.run(
+        ["launchctl", "bootstrap", f"gui/{target_uid}", str(plist_path)],
+        capture_output=True, text=True,
+    )
     if res.returncode != 0:
-        fallback_cmd = (["sudo", "-u", sudo_user] if sudo_user else []) + \
-            ["launchctl", "load", str(plist_path)]
-        res = subprocess.run(fallback_cmd, capture_output=True, text=True)
+        # Fallback: legacy `launchctl asuser <uid> launchctl load`
+        res = subprocess.run(
+            ["launchctl", "asuser", str(target_uid),
+             "launchctl", "load", str(plist_path)],
+            capture_output=True, text=True,
+        )
         if res.returncode != 0:
-            return False, f"launchctl failed: {res.stderr.strip()[:60]}"
+            return False, f"launchctl: {(res.stderr or res.stdout).strip()[:60]}"
     return True, AUTOSTART_LABEL
 
 
