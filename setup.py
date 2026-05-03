@@ -302,7 +302,10 @@ def prompt_url() -> str:
 
 def prompt_api_key() -> str:
     while True:
-        key = ask("API key   ")
+        try:
+            key = getpass.getpass("          API key    ").strip()
+        except EOFError:
+            sys.exit(1)
         if not key:
             out("          " + grey("API key is required."))
             continue
@@ -313,21 +316,39 @@ def prompt_api_key() -> str:
 def host_request(host_url: str, api_key: str, method: str, path: str,
                  body: dict | None = None, timeout: int = 30) -> tuple[int, dict | str]:
     py = venv_python()
-    body_json = json.dumps(body) if body is not None else "None"
     code = (
-        "import sys, json, httpx\n"
-        f"resp = httpx.{method.lower()}("
-        f"'{host_url}{path}', "
-        f"headers={{'X-API-Key': '{api_key}'}}, "
-        f"{'json=' + body_json + ', ' if body is not None else ''}"
-        f"timeout={timeout})\n"
-        "print('STATUS', resp.status_code)\n"
-        "print(resp.text)\n"
+        "import os, sys, json, httpx\n"
+        "key = os.environ['GGEO_API_KEY']\n"
+        "url = os.environ['GGEO_URL']\n"
+        "method = os.environ['GGEO_METHOD']\n"
+        "timeout = int(os.environ['GGEO_TIMEOUT'])\n"
+        "body_str = os.environ.get('GGEO_BODY', '')\n"
+        "kwargs = {'headers': {'X-API-Key': key}, 'timeout': timeout}\n"
+        "if body_str:\n"
+        "    kwargs['json'] = json.loads(body_str)\n"
+        "try:\n"
+        "    resp = getattr(httpx, method.lower())(url, **kwargs)\n"
+        "    print('STATUS', resp.status_code)\n"
+        "    print(resp.text)\n"
+        "except httpx.TimeoutException:\n"
+        "    print('STATUS -1')\n"
+        "    print('timeout')\n"
+        "except httpx.RequestError as e:\n"
+        "    print('STATUS -1')\n"
+        "    print(f'network: {type(e).__name__}')\n"
     )
-    res = subprocess.run([str(py), "-c", code], capture_output=True, text=True)
+    env = os.environ.copy()
+    env["GGEO_API_KEY"] = api_key
+    env["GGEO_URL"] = host_url + path
+    env["GGEO_METHOD"] = method
+    env["GGEO_TIMEOUT"] = str(timeout)
+    if body is not None:
+        env["GGEO_BODY"] = json.dumps(body)
+    res = subprocess.run([str(py), "-c", code],
+                         capture_output=True, text=True, env=env)
     out_str = res.stdout
     if "STATUS " not in out_str:
-        return -1, res.stderr or out_str
+        return -1, res.stderr.strip()[:200] or "no response"
     parts = out_str.split("STATUS ", 1)[1].split("\n", 1)
     status = int(parts[0])
     body_text = parts[1].strip() if len(parts) > 1 else ""
@@ -339,21 +360,30 @@ def host_request(host_url: str, api_key: str, method: str, path: str,
 
 def do_validate(host_url: str, api_key: str) -> dict:
     sp = Spinner(prefix="          ")
-    sp.update(f"POST {host_url}/api/client/validate ...")
+    sp.update(f"POST {host_url} ...")
     sp.start()
+    last_err: str | None = None
     try:
-        status, data = host_request(
-            host_url, api_key, "POST", "/api/client/validate",
-            body={"client_version": VERSION},
-        )
+        for attempt in (1, 2, 3):
+            timeout = 30 if attempt == 1 else 60
+            sp.update(f"POST attempt {attempt}/3 (timeout {timeout}s) ...")
+            status, data = host_request(
+                host_url, api_key, "POST", "/api/client/validate",
+                body={"client_version": VERSION},
+                timeout=timeout,
+            )
+            if status == 200:
+                if not isinstance(data, dict) or not data.get("valid"):
+                    reason = data.get("reason", "unknown") if isinstance(data, dict) else str(data)
+                    raise RuntimeError(f"Host rejected api key (reason={reason})")
+                return data
+            if status == -1:
+                last_err = data if isinstance(data, str) else str(data)
+                continue
+            raise RuntimeError(f"Host returned status {status}")
     finally:
         sp.stop()
-    if status != 200:
-        raise RuntimeError(f"Host validate returned {status}: {data}")
-    if not isinstance(data, dict) or not data.get("valid"):
-        reason = data.get("reason", "unknown") if isinstance(data, dict) else str(data)
-        raise RuntimeError(f"Host rejected api key (reason={reason})")
-    return data
+    raise RuntimeError(f"Host unreachable after 3 attempts ({last_err or 'unknown'})")
 
 def check_user_exists(host_url: str, api_key: str, username: str) -> dict | None:
     status, data = host_request(
@@ -566,61 +596,74 @@ def create_windows_shortcut() -> tuple[bool, str]:
     if not desktop.is_dir():
         return False, f"Desktop not found: {desktop}"
     lnk_path = desktop / f"{SHORTCUT_LABEL}.lnk"
-    ok = False
-    try:
-        import pythoncom
-        from win32com.shell import shell
-        link = pythoncom.CoCreateInstance(
-            shell.CLSID_ShellLink, None,
-            pythoncom.CLSCTX_INPROC_SERVER, shell.IID_IShellLink,
-        )
-        link.SetPath(str(bat_path))
-        link.SetWorkingDirectory(str(ROOT))
-        if icon_path.exists():
-            link.SetIconLocation(str(icon_path), 0)
-        link.SetDescription(SHORTCUT_LABEL)
-        link.QueryInterface(pythoncom.IID_IPersistFile).Save(str(lnk_path), 0)
-        try:
-            with open(lnk_path, "r+b") as f:
-                f.seek(0x15)
-                b = f.read(1)
-                f.seek(0x15)
-                f.write(bytes([b[0] | 0x20]))
-        except Exception:
-            pass
-        ok = lnk_path.exists()
-    except ImportError:
-        vbs_content = (
-            'Set WshShell = CreateObject("WScript.Shell")\n'
-            f'Set oShortcut = WshShell.CreateShortcut("{lnk_path}")\n'
-            f'oShortcut.TargetPath = "{bat_path}"\n'
-            f'oShortcut.WorkingDirectory = "{ROOT}"\n'
-            f'oShortcut.IconLocation = "{icon_path}"\n'
-            f'oShortcut.Description = "{SHORTCUT_LABEL}"\n'
-            'oShortcut.Save\n'
-        )
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".vbs", delete=False, dir=str(ROOT),
-        ) as tf:
-            tf.write(vbs_content)
-            vbs_file = tf.name
-        try:
-            subprocess.run(
-                ["cscript", "//Nologo", vbs_file],
-                capture_output=True, text=True, timeout=15,
-            )
-        finally:
-            try:
-                os.unlink(vbs_file)
-            except OSError:
-                pass
-        ok = lnk_path.exists()
-    except Exception as e:
-        return False, f"shortcut creation failed: {e}"
 
-    if not ok:
-        return False, "shortcut not created"
-    return True, str(lnk_path)
+    method = "vbs"
+    last_err = "unknown"
+    try:
+        import pythoncom  # noqa: F401
+        from win32com.shell import shell  # noqa: F401
+        method = "pywin32"
+    except ImportError as e:
+        last_err = f"pywin32 not installed: {e}"
+
+    if method == "pywin32":
+        try:
+            import pythoncom
+            from win32com.shell import shell
+            link = pythoncom.CoCreateInstance(
+                shell.CLSID_ShellLink, None,
+                pythoncom.CLSCTX_INPROC_SERVER, shell.IID_IShellLink,
+            )
+            link.SetPath(str(bat_path))
+            link.SetWorkingDirectory(str(ROOT))
+            if icon_path.exists():
+                link.SetIconLocation(str(icon_path), 0)
+            link.SetDescription(SHORTCUT_LABEL)
+            link.QueryInterface(pythoncom.IID_IPersistFile).Save(str(lnk_path), 0)
+            try:
+                with open(lnk_path, "r+b") as f:
+                    f.seek(0x15)
+                    b = f.read(1)
+                    f.seek(0x15)
+                    f.write(bytes([b[0] | 0x20]))
+            except Exception:
+                pass
+            if lnk_path.exists():
+                return True, str(lnk_path)
+            last_err = "pywin32 saved but file not found at expected path"
+        except Exception as e:
+            last_err = f"pywin32 error: {type(e).__name__}: {e}"
+
+    vbs_content = (
+        'Set WshShell = CreateObject("WScript.Shell")\n'
+        f'Set oShortcut = WshShell.CreateShortcut("{lnk_path}")\n'
+        f'oShortcut.TargetPath = "{bat_path}"\n'
+        f'oShortcut.WorkingDirectory = "{ROOT}"\n'
+        f'oShortcut.IconLocation = "{icon_path}"\n'
+        f'oShortcut.Description = "{SHORTCUT_LABEL}"\n'
+        'oShortcut.Save\n'
+    )
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".vbs", delete=False, dir=str(ROOT),
+    ) as tf:
+        tf.write(vbs_content)
+        vbs_file = tf.name
+    try:
+        res = subprocess.run(
+            ["cscript", "//Nologo", vbs_file],
+            capture_output=True, text=True, timeout=15,
+        )
+        if res.returncode != 0:
+            last_err = f"cscript rc={res.returncode}: {(res.stderr or res.stdout).strip()[:80]}"
+    finally:
+        try:
+            os.unlink(vbs_file)
+        except OSError:
+            pass
+
+    if lnk_path.exists():
+        return True, str(lnk_path)
+    return False, f"shortcut not created ({last_err})"
 
 
 def do_desktop_shortcut() -> str:
@@ -819,47 +862,47 @@ def _restore_ownership() -> None:
             )
 def closing_card() -> list[str]:
     width = DEFAULT_BOX_WIDTH
-    out_lines: list[str] = []
     from ggeo.cli import box_top, box_bot, box_line
-    out_lines.append(box_top(width))
-    out_lines.append(box_line(width=width))
-    out_lines.append(box_line("  " + green_b(SYM_OK) + " Setup complete", width))
-    out_lines.append(box_line(width=width))
+    lines: list[str] = []
+    lines.append(box_top(width))
+    lines.append(box_line(width=width))
+    lines.append(box_line("  " + green_b(SYM_OK) + " Setup complete", width))
+    lines.append(box_line(width=width))
     if platform.system() in ("Darwin", "Windows"):
-        out_lines.append(box_line(
-            "  Start  double-click '" + cyan(SHORTCUT_LABEL) + "' on Desktop",
-            width,
-        ))
+        lines.append(box_line("  Start  double-click on Desktop:", width))
+        lines.append(box_line("         " + cyan(SHORTCUT_LABEL), width))
     else:
-        out_lines.append(box_line(
-            f"  Start  cd {ROOT} && sudo venv/bin/python run.py",
-            width,
-        ))
-    out_lines.append(box_line(width=width))
-    out_lines.append(box_bot(width))
-    return out_lines
+        lines.append(box_line("  Start", width))
+        lines.append(box_line("         " + grey(f"sudo venv/bin/python run.py"), width))
+    lines.append(box_line(width=width))
+    lines.append(box_bot(width))
+    return lines
 def main() -> None:
     out("")
     out_lines(banner_setup(VERSION))
     out("")
+
     step(1, "Python version check")
     py_ver = do_python_check()
     step_overwrite(1, "Python version check", ok_inline(py_ver))
+
     step(2, "Virtual environment")
     venv_status = do_virtualenv()
     step_overwrite(2, "Virtual environment", ok_inline(venv_status))
+
     step(3, "Installing dependencies")
     do_install_deps()
     step_overwrite(3, "Installing dependencies", ok_inline())
+
     step(4, "Service checks")
     services = do_service_checks()
     svc_status = ok_inline(" · ".join(services)) if services else warn_inline("none active")
     step_overwrite(4, "Service checks", svc_status)
+
     step(5, "Host configuration")
     host_url = prompt_url()
     api_key = prompt_api_key()
-    out_field("Host URL", host_url)
-    out_field("API key", "********")
+
     step(6, "Validate")
     validate_data = do_validate(host_url, api_key)
     name = validate_data.get("client_name") or "?"
@@ -871,17 +914,22 @@ def main() -> None:
         f"{limits.get('max_users', '?')} user · "
         f"{limits.get('max_locations', '?')} loc"
     ))
+
     step(7, "Admin account")
     username, _ = do_admin_account(host_url, api_key)
+
     step(8, "Save data/client.json")
     do_save_client_json(host_url, api_key, validate_data)
     step_overwrite(8, "Save data/client.json", ok_inline())
+
     step(9, "Desktop shortcut")
     sh_status = do_desktop_shortcut()
-    step_overwrite(9, "Desktop shortcut", sh_status)
+    out_indent(sh_status)
+
     step(10, "Autostart on login")
     as_status = do_autostart()
-    step_overwrite(10, "Autostart on login", as_status)
+    out_indent(as_status)
+
     _restore_ownership()
     out("")
     out_lines(closing_card())
@@ -894,8 +942,24 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print()
         print(grey("Setup cancelled."))
+        try:
+            _restore_ownership()
+        except Exception:
+            pass
         sys.exit(130)
+    except RuntimeError as e:
+        print()
+        print(red_b(f"  {SYM_FAIL} {e}"))
+        try:
+            _restore_ownership()
+        except Exception:
+            pass
+        sys.exit(1)
     except Exception as e:
         print()
-        print(red_b(f"  {SYM_FAIL} Setup error: {e}"))
+        print(red_b(f"  {SYM_FAIL} Setup failed: {type(e).__name__}: {e}"))
+        try:
+            _restore_ownership()
+        except Exception:
+            pass
         sys.exit(1)

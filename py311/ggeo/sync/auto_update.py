@@ -10,7 +10,16 @@ from pathlib import Path
 
 logger = logging.getLogger("ggeo.sync.auto_update")
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+def _find_repo_root() -> Path:
+    here = Path(__file__).resolve()
+    for candidate in (here.parent.parent.parent, here.parent.parent.parent.parent,
+                      here.parent.parent.parent.parent.parent):
+        if (candidate / ".git").is_dir() or (candidate / "VERSION").exists():
+            return candidate
+    return here.parent.parent.parent
+
+
+REPO_ROOT = _find_repo_root()
 GIT_DIR = REPO_ROOT / ".git"
 REQUIREMENTS = REPO_ROOT / "requirements.txt"
 
