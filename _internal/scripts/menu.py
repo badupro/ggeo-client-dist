@@ -2,6 +2,7 @@
 """GGeo unified menu launcher — invoked by top-level GGeo.command/.bat."""
 from __future__ import annotations
 
+import json
 import os
 import platform
 import shutil
@@ -154,6 +155,7 @@ def print_menu(default: str) -> None:
         ("4", "View live log only"),
         ("5", "Update from GitHub"),
         ("6", "Uninstall"),
+        ("7", "Edit network settings (port + mDNS)"),
         ("q", "Quit"),
     ]
     print("  Choose an action:\n")
@@ -398,6 +400,84 @@ def action_update() -> None:
     input("\n  Press Enter to return to menu...")
 
 
+def action_edit_network() -> None:
+    clear_screen()
+    print(render_banner("Edit Network Settings"))
+    print()
+
+    cfg_path = INTERNAL / "data" / "client.json"
+    if not cfg_path.exists():
+        print(f"  {fail_inline()} client.json not found.")
+        print(f"    {DIM}Run [1] Setup first to configure.{RST}")
+        input("\n  Press Enter to return to menu...")
+        return
+
+    try:
+        cfg = json.loads(cfg_path.read_text())
+    except Exception as e:
+        print(f"  {fail_inline()} Failed to read config: {e}")
+        input("\n  Press Enter to return to menu...")
+        return
+
+    current_port = cfg.get("port") or 8484
+    current_mdns = cfg.get("mdns_hostname") or "ggeo-client.local"
+
+    print(f"  {DIM}Current:{RST}")
+    print(f"    Port           {C}{current_port}{RST}")
+    print(f"    mDNS hostname  {C}{current_mdns}{RST}")
+    print()
+    print(f"  {DIM}Press Enter to keep current value.{RST}")
+    print()
+
+    try:
+        new_port = input(f"  New port           [{current_port}]: ").strip()
+        new_mdns = input(f"  New mDNS hostname  [{current_mdns}]: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+
+    changed = False
+    if new_port:
+        try:
+            port_int = int(new_port)
+            if not (1 <= port_int <= 65535):
+                raise ValueError("must be 1-65535")
+            cfg["port"] = port_int
+            changed = True
+        except ValueError as e:
+            print(f"\n  {fail_inline()} Invalid port: {e}")
+            input("\n  Press Enter to return to menu...")
+            return
+
+    if new_mdns:
+        if "." not in new_mdns:
+            new_mdns = new_mdns + ".local"
+        cfg["mdns_hostname"] = new_mdns
+        changed = True
+
+    if not changed:
+        print(f"\n  {DIM}No changes.{RST}")
+        input("\n  Press Enter to return to menu...")
+        return
+
+    try:
+        cfg_path.write_text(json.dumps(cfg, indent=2) + "\n")
+        try:
+            os.chmod(cfg_path, 0o600)
+        except OSError:
+            pass
+    except OSError as e:
+        print(f"\n  {fail_inline()} Save failed: {e}")
+        input("\n  Press Enter to return to menu...")
+        return
+
+    print()
+    print(f"  {ok_inline('Saved.')}")
+    print()
+    print(f"  {DIM}Restart server ([2] Start) to apply changes.{RST}")
+    input("\n  Press Enter to return to menu...")
+
+
 def action_uninstall() -> None:
     clear_screen()
     print(render_banner("Uninstall"))
@@ -511,6 +591,7 @@ def main() -> None:
         "4": action_view_log,
         "5": action_update,
         "6": action_uninstall,
+        "7": action_edit_network,
     }
 
     while True:
