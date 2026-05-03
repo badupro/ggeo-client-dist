@@ -220,7 +220,7 @@ def action_setup() -> None:
         rc = subprocess.call(["sudo", sys.executable, str(setup_py)])
     if rc != 0:
         print(f"\n  {fail_inline(f'Setup exited with code {rc}')}")
-    input("\n  Press Enter to close...")
+    input("\n  Press Enter to return to menu...")
 
 
 def action_start_server() -> None:
@@ -231,7 +231,7 @@ def action_start_server() -> None:
         print()
         print(f"  {fail_inline()} venv not found")
         print(f"    {DIM}Run [1] Setup first to install dependencies.{RST}")
-        input("\n  Press Enter to close...")
+        input("\n  Press Enter to return to menu...")
         return
     run_py = INTERNAL / "run.py"
     env = os.environ.copy()
@@ -242,7 +242,7 @@ def action_start_server() -> None:
         rc = subprocess.call(["sudo", "-E", str(py), str(run_py)], env=env)
     print()
     print(f"  {DIM}Server stopped (exit {rc}).{RST}")
-    input("\n  Press Enter to close...")
+    input("\n  Press Enter to return to menu...")
 
 
 def action_start_with_log() -> None:
@@ -277,7 +277,7 @@ def action_view_log() -> None:
         print(f"    {DIM}{log_path}{RST}")
         print()
         print(f"  {DIM}Has the server been started yet?{RST}")
-        input("\n  Press Enter to close...")
+        input("\n  Press Enter to return to menu...")
         return
     print()
     print(f"  {DIM}{log_path}{RST}")
@@ -303,7 +303,7 @@ def action_update() -> None:
     ans = input("  Continue? [Y/n] ").strip().lower()
     if ans == "n":
         print(f"\n  {DIM}Cancelled.{RST}")
-        input("  Press Enter to close...")
+        input("  Press Enter to return to menu...")
         return
     print()
 
@@ -334,7 +334,7 @@ def action_update() -> None:
         err = (res.stderr or res.stdout).strip()[:200]
         step_print(2, total, "Pulling from GitHub", fail_inline("fetch failed"))
         print(f"\n  {DIM}{err}{RST}")
-        input("\n  Press Enter to close...")
+        input("\n  Press Enter to return to menu...")
         return
     res = subprocess.run(
         ["git", "-C", str(ROOT), "reset", "--hard", "origin/main"],
@@ -344,7 +344,7 @@ def action_update() -> None:
         err = (res.stderr or res.stdout).strip()[:200]
         step_print(2, total, "Pulling from GitHub", fail_inline("reset failed"))
         print(f"\n  {DIM}{err}{RST}")
-        input("\n  Press Enter to close...")
+        input("\n  Press Enter to return to menu...")
         return
     step_print(2, total, "Pulling from GitHub", ok_inline())
 
@@ -359,7 +359,7 @@ def action_update() -> None:
     ).returncode
     if rc != 0:
         step_print(3, total, "Rebuilding venv", fail_inline("venv create"))
-        input("\n  Press Enter to close...")
+        input("\n  Press Enter to return to menu...")
         return
     step_print(3, total, "Rebuilding venv", ok_inline())
 
@@ -373,7 +373,7 @@ def action_update() -> None:
     ).returncode
     if rc != 0:
         step_print(4, total, "Installing dependencies", fail_inline("pip"))
-        input("\n  Press Enter to close...")
+        input("\n  Press Enter to return to menu...")
         return
     step_print(4, total, "Installing dependencies", ok_inline())
 
@@ -395,7 +395,7 @@ def action_update() -> None:
 
     new_ver = (ROOT / "VERSION").read_text().strip() if (ROOT / "VERSION").exists() else "?"
     print(render_closing(f"Update complete (v{new_ver})"))
-    input("\n  Press Enter to close...")
+    input("\n  Press Enter to return to menu...")
 
 
 def action_uninstall() -> None:
@@ -411,7 +411,7 @@ def action_uninstall() -> None:
     ans = input("  Continue? [y/N] ").strip().lower()
     if ans != "y":
         print(f"\n  {DIM}Cancelled.{RST}")
-        input("  Press Enter to close...")
+        input("  Press Enter to return to menu...")
         return
     print()
 
@@ -503,17 +503,6 @@ def main() -> None:
         print(f"\n  {fail_inline('Authentication cancelled.')}")
         input("\n  Press Enter to close...")
         return
-    clear_screen()
-    print(banner())
-    default = detect_default()
-    print_menu(default)
-    try:
-        choice = input(f"  Enter choice [{default}]: ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return
-    if not choice:
-        choice = default
 
     actions = {
         "1": action_setup,
@@ -524,16 +513,33 @@ def main() -> None:
         "6": action_uninstall,
     }
 
-    if choice == "q":
-        print(f"  {DIM}Bye.{RST}")
-        return
+    while True:
+        clear_screen()
+        print(banner())
+        default = detect_default()
+        print_menu(default)
+        try:
+            choice = input(f"  Enter choice [{default}]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return
+        if not choice:
+            choice = default
 
-    fn = actions.get(choice)
-    if fn:
+        if choice == "q":
+            print(f"  {DIM}Bye.{RST}")
+            return
+
+        fn = actions.get(choice)
+        if not fn:
+            print(f"  {fail_inline('Invalid choice')}")
+            time.sleep(1)
+            continue
+
         fn()
-    else:
-        print(f"  {fail_inline('Invalid choice')}")
-        time.sleep(1)
+
+        if choice == "6":
+            return
 
 
 if __name__ == "__main__":
