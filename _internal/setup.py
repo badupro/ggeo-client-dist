@@ -834,9 +834,6 @@ def remove_old_autostart(items: list[Path | str]) -> int:
                 n += 1
             except Exception:
                 pass
-    if platform.system() == "Darwin":
-        subprocess.run(["pkill", "-9", "-f", "_internal/tray.py"],
-                       capture_output=True)
         elif isinstance(item, str) and item.startswith("HKCU"):
             try:
                 import winreg
@@ -850,6 +847,9 @@ def remove_old_autostart(items: list[Path | str]) -> int:
                 n += 1
             except Exception:
                 pass
+    if platform.system() == "Darwin":
+        subprocess.run(["pkill", "-9", "-f", "_internal/tray.py"],
+                       capture_output=True)
     return n
 
 
