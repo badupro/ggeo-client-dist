@@ -585,6 +585,13 @@ def create_macos_shortcut() -> tuple[bool, str]:
             subprocess.run(["cp", str(icns), str(applet_icns)], check=False)
         except Exception:
             pass
+        for stale in ("Assets.car", "applet.rsrc"):
+            stale_path = app_path / "Contents" / "Resources" / stale
+            if stale_path.exists():
+                try:
+                    stale_path.unlink()
+                except Exception:
+                    pass
     if sudo_user:
         try:
             subprocess.run(
