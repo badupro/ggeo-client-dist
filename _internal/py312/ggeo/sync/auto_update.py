@@ -83,6 +83,10 @@ def check_and_update() -> bool:
         logger.info("auto-update: disabled via GGEO_NO_AUTOUPDATE")
         return False
 
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        logger.info("auto-update: running as root, skipping (would corrupt .git ownership)")
+        return False
+
     if not GIT_DIR.is_dir():
         logger.info("auto-update: not a git checkout, skipping")
         return False

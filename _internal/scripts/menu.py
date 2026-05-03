@@ -235,10 +235,12 @@ def action_start_server() -> None:
         input("\n  Press Enter to close...")
         return
     run_py = INTERNAL / "run.py"
+    env = os.environ.copy()
+    env["GGEO_NO_AUTOUPDATE"] = "1"
     if platform.system() == "Windows":
-        rc = subprocess.call([str(py), str(run_py)])
+        rc = subprocess.call([str(py), str(run_py)], env=env)
     else:
-        rc = subprocess.call(["sudo", str(py), str(run_py)])
+        rc = subprocess.call(["sudo", "-E", str(py), str(run_py)], env=env)
     print()
     print(f"  {DIM}Server stopped (exit {rc}).{RST}")
     input("\n  Press Enter to close...")
@@ -310,6 +312,20 @@ def action_update() -> None:
 
     kill_port_8484()
     step_print(1, total, "Stopping server", ok_inline())
+
+    if platform.system() != "Windows":
+        git_dir = ROOT / ".git"
+        if git_dir.exists():
+            try:
+                if git_dir.stat().st_uid != os.getuid():
+                    subprocess.run(
+                        ["sudo", "-n", "chown", "-R",
+                         f"{os.getuid()}:{os.getgid()}", str(git_dir),
+                         str(ROOT)],
+                        capture_output=True,
+                    )
+            except OSError:
+                pass
 
     res = subprocess.run(
         ["git", "-C", str(ROOT), "fetch", "origin", "main"],

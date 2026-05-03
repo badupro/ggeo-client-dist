@@ -986,7 +986,9 @@ def _restore_ownership() -> None:
         pw = pwd.getpwnam(sudo_user)
     except Exception:
         return
-    targets = [VENV_DIR, DATA_DIR, SCRIPTS_DIR, CLIENT_JSON]
+    install_root = ROOT.parent
+    git_dir = install_root / ".git"
+    targets = [VENV_DIR, DATA_DIR, SCRIPTS_DIR, CLIENT_JSON, git_dir]
     for path in targets:
         if path.exists():
             subprocess.run(
