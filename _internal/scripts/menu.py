@@ -165,6 +165,22 @@ def print_menu(default: str) -> None:
     print()
 
 
+def request_sudo_upfront() -> bool:
+    """Cache sudo credentials at wizard start so menu actions never reprompt mid-flow."""
+    if platform.system() == "Windows":
+        return True
+    if os.geteuid() == 0:
+        return True
+    rc = subprocess.run(["sudo", "-n", "-v"], capture_output=True).returncode
+    if rc == 0:
+        return True
+    print()
+    print(f"  {DIM}Admin password required (one-time, cached for this session):{RST}")
+    print()
+    rc = subprocess.call(["sudo", "-v"])
+    return rc == 0
+
+
 def kill_port_8484() -> None:
     if platform.system() == "Windows":
         try:
@@ -466,6 +482,12 @@ def main() -> None:
         action_view_log()
         return
 
+    clear_screen()
+    print(banner())
+    if not request_sudo_upfront():
+        print(f"\n  {fail_inline('Authentication cancelled.')}")
+        input("\n  Press Enter to close...")
+        return
     clear_screen()
     print(banner())
     default = detect_default()
