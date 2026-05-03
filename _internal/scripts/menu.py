@@ -61,7 +61,7 @@ def detect_default() -> str:
     return "3"
 
 
-def banner() -> str:
+def render_banner(action_title: str = None) -> str:
     width = 54
     inner = width - 2
     inset = "   "
@@ -69,11 +69,18 @@ def banner() -> str:
     logo_width = 12
     avail = inner - len(inset) - logo_width - len(sep)
 
-    titles = [
-        (f"GGeo Client v{VERSION}", None),
-        ("Mobile GPS Location Spoofer", DIM),
-        ("by Gpro · badupro", DIM),
-    ]
+    if action_title:
+        titles = [
+            (action_title, None),
+            (f"v{VERSION} · by Gpro · badupro", DIM),
+            ("Mobile GPS Location Spoofer", DIM),
+        ]
+    else:
+        titles = [
+            (f"GGeo Client v{VERSION}", None),
+            ("Mobile GPS Location Spoofer", DIM),
+            ("by Gpro · badupro", DIM),
+        ]
     logos = ["╔═╗╔═╗┌─┐┌─┐", "║ ╦║ ╦├┤ │ │", "╚═╝╚═╝└─┘└─┘"]
 
     lines = ["", BLUE + "╔" + "═" * inner + "╗" + RST,
@@ -89,6 +96,54 @@ def banner() -> str:
     lines.append(BLUE + "║" + " " * inner + "║" + RST)
     lines.append(BLUE + "╚" + "═" * inner + "╝" + RST)
     return "\n".join(lines) + "\n"
+
+
+def banner() -> str:
+    return render_banner()
+
+
+def render_closing(message: str) -> str:
+    width = 54
+    inner = width - 2
+    pad_msg = max(0, inner - 4 - len(message))
+    return (
+        f"\n{BLUE}╔{'═' * inner}╗{RST}\n"
+        f"{BLUE}║{' ' * inner}║{RST}\n"
+        f"{BLUE}║{RST}  {G}✓{RST} {message}{' ' * pad_msg}{BLUE}║{RST}\n"
+        f"{BLUE}║{' ' * inner}║{RST}\n"
+        f"{BLUE}╚{'═' * inner}╝{RST}\n"
+    )
+
+
+def step_line(num: int, total: int, label: str, status: str = "") -> str:
+    left = f"  {C}[{num}/{total}]{RST}  {label}"
+    if not status:
+        return left
+    visible_left = 2 + 2 + len(str(num)) + 1 + len(str(total)) + 1 + 2 + len(label)
+    pad = max(2, 40 - visible_left)
+    return left + " " * pad + status
+
+
+def step_print(num, total, label, status=""):
+    print(step_line(num, total, label, status))
+
+
+def step_overwrite(num, total, label, status):
+    sys.stdout.write("\x1b[F\x1b[2K")
+    sys.stdout.flush()
+    print(step_line(num, total, label, status))
+
+
+def ok_inline(msg=""):
+    return f"{G}✓{RST}" + (" " + msg if msg else "")
+
+
+def warn_inline(msg=""):
+    return f"{Y}⚠{RST}" + (" " + msg if msg else "")
+
+
+def fail_inline(msg=""):
+    return f"{R}✗{RST}" + (" " + msg if msg else "")
 
 
 def print_menu(default: str) -> None:
@@ -200,66 +255,102 @@ def action_view_log() -> None:
 
 def action_update() -> None:
     clear_screen()
-    print("  GGeo Client Update\n")
-    print("  This will fetch latest from GitHub, rebuild venv,")
-    print("  and reinstall dependencies.\n")
+    print(render_banner("Update from GitHub"))
+    print()
+    print(f"  {DIM}This will fetch latest from GitHub, rebuild venv,{RST}")
+    print(f"  {DIM}and reinstall dependencies.{RST}")
+    print()
     ans = input("  Continue? [Y/n] ").strip().lower()
     if ans == "n":
-        print("  Cancelled.")
+        print(f"\n  {DIM}Cancelled.{RST}")
         input("  Press Enter to close...")
         return
+    print()
 
-    print("\n  Stopping server...")
+    total = 4
+
+    step_print(1, total, "Stopping server")
     kill_port_8484()
+    step_overwrite(1, total, "Stopping server", ok_inline())
 
-    print("  git fetch + reset...")
-    if subprocess.call(["git", "-C", str(ROOT), "fetch", "origin", "main"]) != 0:
-        input("  fetch failed. Press Enter...")
+    step_print(2, total, "Pulling from GitHub")
+    rc = subprocess.run(
+        ["git", "-C", str(ROOT), "fetch", "--quiet", "origin", "main"],
+        capture_output=True, text=True,
+    ).returncode
+    if rc != 0:
+        step_overwrite(2, total, "Pulling from GitHub", fail_inline("git fetch"))
+        input("\n  Press Enter to close...")
         return
-    if subprocess.call(["git", "-C", str(ROOT), "reset", "--hard", "origin/main"]) != 0:
-        input("  reset failed. Press Enter...")
+    rc = subprocess.run(
+        ["git", "-C", str(ROOT), "reset", "--hard", "--quiet", "origin/main"],
+        capture_output=True, text=True,
+    ).returncode
+    if rc != 0:
+        step_overwrite(2, total, "Pulling from GitHub", fail_inline("git reset"))
+        input("\n  Press Enter to close...")
         return
+    step_overwrite(2, total, "Pulling from GitHub", ok_inline())
 
-    print("  Removing old venv...")
+    step_print(3, total, "Rebuilding venv")
     venv_dir = INTERNAL / "venv"
     if platform.system() == "Windows":
         shutil.rmtree(venv_dir, ignore_errors=True)
     else:
-        subprocess.call(["sudo", "rm", "-rf", str(venv_dir)])
-
-    print("  Creating fresh venv...")
-    if subprocess.call([sys.executable, "-m", "venv", str(venv_dir)]) != 0:
-        input("  venv creation failed. Press Enter...")
+        subprocess.run(["sudo", "rm", "-rf", str(venv_dir)], capture_output=True)
+    rc = subprocess.run(
+        [sys.executable, "-m", "venv", str(venv_dir)],
+        capture_output=True, text=True,
+    ).returncode
+    if rc != 0:
+        step_overwrite(3, total, "Rebuilding venv", fail_inline("venv create"))
+        input("\n  Press Enter to close...")
         return
+    step_overwrite(3, total, "Rebuilding venv", ok_inline())
 
-    print("  Installing dependencies...")
+    step_print(4, total, "Installing dependencies")
     py = venv_python()
-    subprocess.call([str(py), "-m", "pip", "install", "--upgrade", "pip", "--quiet"])
-    if subprocess.call(
-        [str(py), "-m", "pip", "install", "-r", str(INTERNAL / "requirements.txt")]
-    ) != 0:
-        input("  pip install failed. Press Enter...")
+    subprocess.run([str(py), "-m", "pip", "install", "--upgrade", "pip",
+                    "--quiet"], capture_output=True)
+    rc = subprocess.run(
+        [str(py), "-m", "pip", "install", "--quiet", "-r",
+         str(INTERNAL / "requirements.txt")],
+        capture_output=True, text=True,
+    ).returncode
+    if rc != 0:
+        step_overwrite(4, total, "Installing dependencies", fail_inline("pip"))
+        input("\n  Press Enter to close...")
         return
+    step_overwrite(4, total, "Installing dependencies", ok_inline())
 
     new_ver = (ROOT / "VERSION").read_text().strip() if (ROOT / "VERSION").exists() else "?"
-    print(f"\n  Update complete. Version: {new_ver}")
-    input("  Press Enter to close...")
+    print(render_closing(f"Update complete (v{new_ver})"))
+    input("\n  Press Enter to close...")
 
 
 def action_uninstall() -> None:
     clear_screen()
-    print("  GGeo Client Uninstaller\n")
-    print(f"  This will remove server, autostart, desktop shortcut,")
-    print(f"  AND the entire install folder:\n  {ROOT}\n")
+    print(render_banner("Uninstall"))
+    print()
+    print(f"  {DIM}This will remove:{RST}")
+    print(f"    {DIM}- Server (running process if any){RST}")
+    print(f"    {DIM}- Autostart entry{RST}")
+    print(f"    {DIM}- Desktop shortcut{RST}")
+    print(f"    {DIM}- Install folder: {ROOT}{RST}")
+    print()
     ans = input("  Continue? [y/N] ").strip().lower()
     if ans != "y":
-        print("  Cancelled.")
+        print(f"\n  {DIM}Cancelled.{RST}")
         input("  Press Enter to close...")
         return
+    print()
 
+    step_print(1, 4, "Stopping server")
     kill_port_8484()
+    step_overwrite(1, 4, "Stopping server", ok_inline())
 
     if platform.system() == "Windows":
+        step_print(2, 4, "Removing autostart")
         try:
             import winreg
             with winreg.OpenKey(
@@ -281,48 +372,61 @@ def action_uninstall() -> None:
                     winreg.DeleteValue(k, n)
         except Exception:
             pass
+        step_overwrite(2, 4, "Removing autostart", ok_inline())
+
+        step_print(3, 4, "Removing desktop shortcut")
         for desktop in (
             Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop",
             Path(os.environ.get("USERPROFILE", str(Path.home()))) / "OneDrive" / "Desktop",
         ):
             if desktop.is_dir():
-                for lnk in desktop.glob("GGeo*Client*.lnk"):
+                for lnk in list(desktop.glob("GGeo*Client*.lnk")) + list(desktop.glob("GGEO*Client*.lnk")):
                     try:
                         lnk.unlink()
                     except Exception:
                         pass
-                for lnk in desktop.glob("GGEO*Client*.lnk"):
-                    try:
-                        lnk.unlink()
-                    except Exception:
-                        pass
+        step_overwrite(3, 4, "Removing desktop shortcut", ok_inline())
+
+        step_print(4, 4, "Removing install folder")
         os.system(
             f'start /B cmd /C "timeout /t 2 /nobreak > nul && rd /s /q "{ROOT}""'
         )
-        print("\n  Uninstall scheduled. Folder will be deleted shortly.")
+        step_overwrite(4, 4, "Removing install folder", ok_inline("scheduled"))
     else:
-        os.system('sudo pkill -9 -f "_internal/run.py" 2>/dev/null')
-        os.system('sudo pkill -9 -f "_internal/tray.py" 2>/dev/null')
+        step_print(2, 4, "Removing autostart")
+        subprocess.run(["sudo", "pkill", "-9", "-f", "_internal/run.py"],
+                       capture_output=True)
+        subprocess.run(["sudo", "pkill", "-9", "-f", "_internal/tray.py"],
+                       capture_output=True)
         agents = Path.home() / "Library" / "LaunchAgents"
         if agents.is_dir():
             for plist in agents.glob("com.ggeo.tray.*.plist"):
                 label = plist.stem
-                os.system(f'launchctl bootout "gui/$(id -u)/{label}" 2>/dev/null')
-                os.system(f'sudo launchctl bootout "system/{label}" 2>/dev/null')
+                subprocess.run(["launchctl", "bootout",
+                                f"gui/{os.getuid()}/{label}"],
+                               capture_output=True)
+                subprocess.run(["sudo", "launchctl", "bootout",
+                                f"system/{label}"], capture_output=True)
                 try:
                     plist.unlink()
                 except Exception:
                     pass
-        for app in (Path.home() / "Desktop").glob("*GGeo*Client*.app"):
-            shutil.rmtree(app, ignore_errors=True)
-        for app in (Path.home() / "Desktop").glob("*GGEO*Client*.app"):
-            shutil.rmtree(app, ignore_errors=True)
-        trash = f"/tmp/.ggeo-trash-{os.getpid()}"
-        os.system(f'sudo mv "{ROOT}" "{trash}"')
-        os.system(f'sudo rm -rf "{trash}" &')
-        print("\n  Uninstall complete.")
+        step_overwrite(2, 4, "Removing autostart", ok_inline())
 
-    input("  Press Enter to close...")
+        step_print(3, 4, "Removing desktop shortcut")
+        for app in list((Path.home() / "Desktop").glob("*GGeo*Client*.app")) + \
+                   list((Path.home() / "Desktop").glob("*GGEO*Client*.app")):
+            shutil.rmtree(app, ignore_errors=True)
+        step_overwrite(3, 4, "Removing desktop shortcut", ok_inline())
+
+        step_print(4, 4, "Removing install folder")
+        trash = f"/tmp/.ggeo-trash-{os.getpid()}"
+        subprocess.run(["sudo", "mv", str(ROOT), trash], capture_output=True)
+        subprocess.Popen(["sudo", "rm", "-rf", trash])
+        step_overwrite(4, 4, "Removing install folder", ok_inline())
+
+    print(render_closing("Uninstall complete"))
+    input("\n  Press Enter to close...")
 
 
 def main() -> None:
