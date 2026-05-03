@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GGeo Tray launcher — dispatch to obfuscated tree matching Python version."""
+"""GGeo Tray launcher."""
 from __future__ import annotations
 
 import os

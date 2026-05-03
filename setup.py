@@ -20,49 +20,120 @@ CLIENT_JSON = DATA_DIR / "client.json"
 SCRIPTS_DIR = ROOT / "scripts"
 VENV_DIR = ROOT / "venv"
 
-
-# When running from a built dist/ tree (top-level setup.py), the ggeo package
-# lives inside dist/<py_tag>/ggeo/ rather than at top level. Insert it to
-# sys.path so `from ggeo.autostart import ...` etc. resolve. Source repo runs
-# (where ROOT/ggeo/ exists) skip this branch.
 _PY_TAG = f"py{sys.version_info.major}{sys.version_info.minor}"
 _PY_TREE = ROOT / _PY_TAG
 if _PY_TREE.is_dir() and (_PY_TREE / "ggeo" / "__init__.py").exists():
     sys.path.insert(0, str(_PY_TREE))
 
+SUPPORTED_PYTHONS = {(3, 11), (3, 12), (3, 13)}
+TOTAL_STEPS = 10
+DEFAULT_PORT = 8484
 
-def banner(msg: str) -> None:
+try:
+    VERSION = (ROOT / "VERSION").read_text().strip()
+except Exception:
+    VERSION = "2.3.0"
+
+SHORTCUT_LABEL = f"GGeo Client v{VERSION}"
+AUTOSTART_LABEL = "com.ggeo.tray." + VERSION.replace(".", "_")
+
+
+def _early_force_close(title: str, lines: list[str]) -> None:
     print()
-    print("=" * 60)
-    print(msg)
-    print("=" * 60)
-
-
-def step(n: int, total: int, msg: str) -> None:
+    print("=" * 56)
+    print(f"  X  {title}")
     print()
-    print(f"[{n}/{total}] {msg}")
+    for ln in lines:
+        print(f"  {ln}")
+    print("=" * 56)
+    print()
 
 
-def ok(msg: str) -> None:
-    print(f"    [OK]   {msg}")
+def _ensure_elevated() -> None:
+    system = platform.system()
+    if system == "Darwin":
+        if os.geteuid() != 0:
+            print("Re-executing with sudo for setup ...")
+            os.execvp("sudo", ["sudo", "-E", sys.executable] + sys.argv)
+    elif system == "Windows":
+        try:
+            import ctypes
+            is_admin = bool(ctypes.windll.shell32.IsUserAnAdmin())
+        except Exception:
+            is_admin = True
+        if not is_admin:
+            _early_force_close(
+                "Administrator privileges required",
+                [
+                    "Right-click 'Setup-GGEO.bat'",
+                    "and choose 'Run as administrator'",
+                    "",
+                    "Press any key to exit...",
+                ],
+            )
+            try:
+                input()
+            except Exception:
+                pass
+            sys.exit(1)
 
 
-def warn(msg: str) -> None:
-    print(f"    [WARN] {msg}")
+_ensure_elevated()
+
+try:
+    from ggeo.cli import (
+        cyan, cyan_b, green, green_b, yellow, yellow_b, red, red_b,
+        grey, underline_cyan, banner_setup, force_close_box,
+        error_box_inline, step_line, step_indent, Spinner,
+        SYM_OK, SYM_WARN, SYM_FAIL, BOX, DEFAULT_BOX_WIDTH,
+    )
+except ImportError as e:
+    print(f"FATAL: cannot import ggeo.cli ({e})", file=sys.stderr)
+    print(f"sys.path: {sys.path[:3]}", file=sys.stderr)
+    sys.exit(1)
+def out(line: str = "") -> None:
+    print(line)
 
 
-def info(msg: str) -> None:
-    print(f"    [INFO] {msg}")
+def out_lines(lines: list[str]) -> None:
+    for ln in lines:
+        print(ln)
 
 
-def fail(msg: str) -> None:
-    print(f"    [FAIL] {msg}")
+def step(num: int, label: str, status: str = "") -> None:
+    out(step_line(num, TOTAL_STEPS, label, status))
+
+
+def step_overwrite(num: int, label: str, status: str) -> None:
+    sys.stdout.write("\x1b[F\x1b[2K")
+    sys.stdout.flush()
+    out(step_line(num, TOTAL_STEPS, label, status))
+
+
+def ok_inline(msg: str = "") -> str:
+    return green_b(SYM_OK) + (" " + msg if msg else "")
+
+
+def warn_inline(msg: str = "") -> str:
+    return yellow(SYM_WARN) + (" " + msg if msg else "")
+
+
+def fail_inline(msg: str = "") -> str:
+    return red_b(SYM_FAIL) + (" " + msg if msg else "")
+
+
+def out_field(label: str, value: str) -> None:
+    out("          " + grey(f"{label:10} ") + value)
+
+
+def out_indent(text: str) -> None:
+    out("          " + text)
 
 
 def ask_yes_no(question: str, default: bool = True) -> bool:
     suffix = " [Y/n]" if default else " [y/N]"
     try:
-        ans = input(f"    {question}{suffix}: ").strip().lower()
+        ans = input("          " + question + suffix + " ").strip().lower()
     except EOFError:
         return default
     if not ans:
@@ -70,40 +141,22 @@ def ask_yes_no(question: str, default: bool = True) -> bool:
     return ans in ("y", "yes")
 
 
-def prompt(message: str, default: str | None = None) -> str:
+def ask(question: str, default: str | None = None) -> str:
     suffix = f" [{default}]" if default else ""
-    value = input(f"    {message}{suffix}: ").strip()
-    return value or (default or "")
+    val = input("          " + question + suffix + " ").strip()
+    return val or (default or "")
 
 
 def venv_python() -> Path:
     if platform.system() == "Windows":
         return VENV_DIR / "Scripts" / "python.exe"
     return VENV_DIR / "bin" / "python"
-
-
-
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 
 
-def _can_unicode() -> bool:
-    enc = (sys.stdout.encoding or "utf-8").lower()
-    if "utf" in enc:
-        return True
-    try:
-        "⠋".encode(enc)
-        return True
-    except (UnicodeEncodeError, LookupError):
-        return False
-
-
-def run_with_spinner(cmd: list[str], idle_label: str = "working ...",
-                     timeout: int | None = None) -> int:
-    """Run *cmd* and show a spinner + last line of output until exit."""
-    if not sys.stdout.isatty():
-        return subprocess.call(cmd)
-
-    spinner = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏" if _can_unicode() else "|/-\\"
+def run_streamed(cmd: list[str], sp: Spinner,
+                 idle: str = "working ...", timeout: int = 300) -> int:
+    sp.update(idle)
     try:
         proc = subprocess.Popen(
             cmd,
@@ -112,324 +165,252 @@ def run_with_spinner(cmd: list[str], idle_label: str = "working ...",
             text=True,
             bufsize=1,
         )
-    except FileNotFoundError as e:
-        fail(f"Command not found: {e}")
+    except FileNotFoundError:
         return 127
-
-    state = {"last": idle_label, "stop": False}
-    lock = threading.Lock()
 
     def reader() -> None:
         try:
             assert proc.stdout is not None
             for raw in proc.stdout:
                 line = _ANSI_RE.sub("", raw).strip()
-                if not line:
+                if not line or "already satisfied" in line.lower():
                     continue
-                if "already satisfied" in line.lower():
-                    continue
-                with lock:
-                    state["last"] = line[:64]
+                sp.update(line[:60])
         except Exception:
             pass
-        finally:
-            with lock:
-                state["stop"] = True
 
     t = threading.Thread(target=reader, daemon=True)
     t.start()
-
-    start = time.monotonic()
-    i = 0
     try:
-        while True:
-            with lock:
-                if state["stop"] and proc.poll() is not None:
-                    break
-                msg = state["last"]
-            elapsed = int(time.monotonic() - start)
-            char = spinner[i % len(spinner)]
-            line = f"    [{char}] {msg}  ({elapsed}s)"
-            # Clip to terminal width; fallback 80 cols
-            try:
-                width = os.get_terminal_size().columns
-            except OSError:
-                width = 80
-            line = line[: max(20, width - 1)]
-            sys.stdout.write("\r" + line.ljust(min(80, width - 1)))
-            sys.stdout.flush()
-            time.sleep(0.1)
-            i += 1
-            if timeout and time.monotonic() - start > timeout:
-                proc.terminate()
-                break
-    finally:
-        # Clear spinner line.
-        try:
-            width = os.get_terminal_size().columns
-        except OSError:
-            width = 80
-        sys.stdout.write("\r" + " " * (width - 1) + "\r")
-        sys.stdout.flush()
+        return proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.terminate()
+        return 124
 
-    t.join(timeout=2)
-    return proc.wait(timeout=5)
-
-
-
-SUPPORTED_PYTHONS = {(3, 11), (3, 12), (3, 13)}
-
-
-def step_python_version() -> None:
+def do_python_check() -> str:
     v = sys.version_info
-    py_tuple = (v.major, v.minor)
-    if py_tuple not in SUPPORTED_PYTHONS:
-        fail(f"Python {v.major}.{v.minor}.{v.micro} not supported.")
-        info("Supported: Python 3.11, 3.12, 3.13.")
-        info("PyArmor binary is built per Python version; install a supported one.")
-        info("Download: https://python.org/downloads/")
+    if (v.major, v.minor) not in SUPPORTED_PYTHONS:
+        out("")
+        out(red_b(f"  {SYM_FAIL} Python {v.major}.{v.minor}.{v.micro} not supported"))
+        out("    " + grey("Supported: Python 3.11, 3.12, 3.13"))
+        out("    " + grey("Install: https://python.org/downloads/"))
         sys.exit(1)
-    ok(f"Python {v.major}.{v.minor}.{v.micro} detected.")
+    return f"{v.major}.{v.minor}.{v.micro}"
 
-
-
-def step_virtualenv() -> None:
+def do_virtualenv() -> str:
     if VENV_DIR.exists():
-        ok(f"venv already exists: {VENV_DIR}")
-        return
-    info(f"Creating virtual environment at {VENV_DIR} ...")
-    rc = run_with_spinner(
-        [sys.executable, "-m", "venv", str(VENV_DIR)],
-        idle_label="creating virtualenv ...",
-        timeout=120,
-    )
+        return "./venv " + grey("(existing)")
+    sp = Spinner(prefix="          ")
+    sp.update("creating ./venv ...")
+    sp.start()
+    try:
+        rc = subprocess.run(
+            [sys.executable, "-m", "venv", str(VENV_DIR)],
+            capture_output=True, timeout=120,
+        ).returncode
+    finally:
+        sp.stop()
     if rc != 0:
-        fail("venv creation failed")
-        sys.exit(1)
-    ok("venv created.")
+        raise RuntimeError("venv creation failed")
+    return "./venv"
 
-
-
-def step_install_deps() -> None:
+def do_install_deps() -> None:
     req = ROOT / "requirements.txt"
     if not req.is_file():
-        fail(f"{req} not found.")
-        sys.exit(1)
+        raise FileNotFoundError(f"{req} not found")
     py = venv_python()
-
-    info("Upgrading pip ...")
-    rc = run_with_spinner(
-        [str(py), "-m", "pip", "install", "--upgrade", "pip"],
-        idle_label="upgrading pip ...",
-        timeout=180,
-    )
+    sp = Spinner(prefix="          ")
+    sp.start()
+    try:
+        run_streamed(
+            [str(py), "-m", "pip", "install", "--upgrade", "pip"],
+            sp, idle="upgrading pip ...", timeout=180,
+        )
+        rc = run_streamed(
+            [str(py), "-m", "pip", "install", "-r", str(req)],
+            sp, idle="resolving deps ...", timeout=600,
+        )
+    finally:
+        sp.stop()
     if rc != 0:
-        warn("pip upgrade had warnings (non-fatal).")
+        raise RuntimeError("pip install failed")
 
-    info(f"Installing dependencies from {req.name} ...")
-    rc = run_with_spinner(
-        [str(py), "-m", "pip", "install", "-r", str(req)],
-        idle_label="resolving dependencies ...",
-        timeout=600,
-    )
-    if rc != 0:
-        fail("pip install failed. Run manually to inspect the error:")
-        print(f"    {py} -m pip install -r {req}")
-        sys.exit(1)
-    ok("Dependencies installed.")
-
-
-
-def step_service_checks() -> None:
+def do_service_checks() -> list[str]:
     system = platform.system()
     if system == "Darwin":
-        # usbmuxd is bundled with macOS via launchd. No action needed.
-        ok("macOS: usbmuxd auto-managed by launchd.")
-        return
-
+        return ["usbmuxd"]
     if system == "Linux":
+        services = []
         try:
             res = subprocess.run(
                 ["systemctl", "is-active", "usbmuxd"],
                 capture_output=True, text=True, timeout=5,
             )
             if res.returncode == 0:
-                ok("usbmuxd active.")
-            else:
-                warn("usbmuxd inactive. Run: sudo systemctl start usbmuxd")
-        except Exception as e:
-            warn(f"usbmuxd check failed: {e}")
-        return
-
+                services.append("usbmuxd")
+        except Exception:
+            pass
+        return services
     if system == "Windows":
-        # Check Apple Mobile Device Service (USB) + Bonjour Service (WiFi).
+        services: list[str] = []
         try:
             res = subprocess.run(
                 ["sc", "query", "Apple Mobile Device Service"],
                 capture_output=True, text=True, timeout=5,
             )
             if "RUNNING" in res.stdout:
-                ok("Apple Mobile Device Service running.")
-            else:
-                warn("Apple Mobile Device Service not running. Install iTunes.")
-        except Exception as e:
-            warn(f"AMDS check failed: {e}")
-
-        # Bonjour Service: required for WiFi device discovery.
+                services.append("Apple MD")
+        except Exception:
+            pass
         try:
-            bres = subprocess.run(
+            res = subprocess.run(
                 ["sc", "query", "Bonjour Service"],
                 capture_output=True, text=True, timeout=5,
             )
-            if "RUNNING" in bres.stdout:
-                ok("Bonjour Service running.")
-                return
-            if "1060" in bres.stdout or "does not exist" in bres.stdout.lower():
-                warn(
-                    "Bonjour Service is not installed. Install iTunes "
-                    "(bundles Bonjour) or Bonjour Print Services."
+            if "RUNNING" in res.stdout:
+                services.append("Bonjour")
+            elif "1060" not in res.stdout:
+                subprocess.run(
+                    ["sc", "config", "Bonjour Service", "start=", "auto"],
+                    capture_output=True, text=True, timeout=5,
                 )
-                return
-            info("Bonjour Service stopped. Attempting to start ...")
-            subprocess.run(
-                ["sc", "config", "Bonjour Service", "start=", "auto"],
-                capture_output=True, text=True, timeout=5,
-            )
-            subprocess.run(
-                ["sc", "start", "Bonjour Service"],
-                capture_output=True, text=True, timeout=10,
-            )
-            recheck = subprocess.run(
-                ["sc", "query", "Bonjour Service"],
-                capture_output=True, text=True, timeout=5,
-            )
-            if "RUNNING" in recheck.stdout:
-                ok("Bonjour Service started + set to Automatic.")
-            else:
-                warn("Could not start Bonjour Service automatically.")
-                warn("Open PowerShell as Administrator and run:")
-                warn("  Set-Service 'Bonjour Service' -StartupType Automatic")
-                warn("  Start-Service 'Bonjour Service'")
-        except Exception as e:
-            warn(f"Bonjour check/start failed: {e}")
-
-
+                subprocess.run(
+                    ["sc", "start", "Bonjour Service"],
+                    capture_output=True, text=True, timeout=10,
+                )
+                recheck = subprocess.run(
+                    ["sc", "query", "Bonjour Service"],
+                    capture_output=True, text=True, timeout=5,
+                )
+                if "RUNNING" in recheck.stdout:
+                    services.append("Bonjour")
+        except Exception:
+            pass
+        return services
+    return []
 
 def prompt_url() -> str:
-    info("Host URL is provided by the GGEO Host operator.")
     while True:
-        url = input("    Host URL: ").strip()
+        url = ask("Host URL  ")
         if not url:
-            print("    Host URL is required.")
+            out("          " + grey("Host URL is required."))
             continue
-        if url.startswith("http://") or url.startswith("https://"):
+        if url.startswith(("http://", "https://")):
             return url.rstrip("/")
-        print("    Must start with http:// or https://")
+        out("          " + grey("Must start with http:// or https://"))
 
 
 def prompt_api_key() -> str:
-    info("API key is provided by the GGEO Host operator.")
     while True:
-        key = input("    API key: ").strip()
+        key = ask("API key   ")
         if not key:
-            print("    API key is required.")
+            out("          " + grey("API key is required."))
             continue
         if key.startswith("ggeo_") and key.count("_") >= 2:
             return key
-        print("    Invalid format. Expected: ggeo_{uuid}_{hex}")
+        out("          " + grey("Invalid format. Expected: ggeo_{uuid}_{hex}"))
 
-
-
-def validate_with_host(host_url: str, api_key: str) -> dict:
+def host_request(host_url: str, api_key: str, method: str, path: str,
+                 body: dict | None = None, timeout: int = 30) -> tuple[int, dict | str]:
     py = venv_python()
-    info(f"POST {host_url}/api/client/validate ...")
+    body_json = json.dumps(body) if body is not None else "None"
     code = (
-        "import json, sys\n"
-        "import httpx\n"
-        f"resp = httpx.post('{host_url}/api/client/validate',"
-        f" headers={{'X-API-Key': '{api_key}'}},"
-        " json={'client_version': '2.2.0'}, timeout=30)\n"
+        "import sys, json, httpx\n"
+        f"resp = httpx.{method.lower()}("
+        f"'{host_url}{path}', "
+        f"headers={{'X-API-Key': '{api_key}'}}, "
+        f"{'json=' + body_json + ', ' if body is not None else ''}"
+        f"timeout={timeout})\n"
         "print('STATUS', resp.status_code)\n"
         "print(resp.text)\n"
     )
     res = subprocess.run([str(py), "-c", code], capture_output=True, text=True)
-    if "STATUS 200" not in res.stdout:
-        fail("Host did not return 200")
-        print(res.stdout)
-        print(res.stderr)
-        sys.exit(1)
-    body_line = res.stdout.split("STATUS 200", 1)[1].strip()
+    out_str = res.stdout
+    if "STATUS " not in out_str:
+        return -1, res.stderr or out_str
+    parts = out_str.split("STATUS ", 1)[1].split("\n", 1)
+    status = int(parts[0])
+    body_text = parts[1].strip() if len(parts) > 1 else ""
     try:
-        data = json.loads(body_line)
+        return status, json.loads(body_text) if body_text else {}
     except json.JSONDecodeError:
-        fail("Could not parse host response as JSON.")
-        print(body_line)
-        sys.exit(1)
-    if not data.get("valid"):
-        reason = data.get("reason", "unknown")
-        fail(f"Host rejected api key (reason={reason})")
-        sys.exit(1)
-    ok(f"Connected. client_name='{data.get('client_name')}'")
-    limits = data.get("limits") or {}
-    for k, v in sorted(limits.items()):
-        info(f"  {k}: {v}")
+        return status, body_text
+
+
+def do_validate(host_url: str, api_key: str) -> dict:
+    sp = Spinner(prefix="          ")
+    sp.update(f"POST {host_url}/api/client/validate ...")
+    sp.start()
+    try:
+        status, data = host_request(
+            host_url, api_key, "POST", "/api/client/validate",
+            body={"client_version": VERSION},
+        )
+    finally:
+        sp.stop()
+    if status != 200:
+        raise RuntimeError(f"Host validate returned {status}: {data}")
+    if not isinstance(data, dict) or not data.get("valid"):
+        reason = data.get("reason", "unknown") if isinstance(data, dict) else str(data)
+        raise RuntimeError(f"Host rejected api key (reason={reason})")
     return data
 
+def check_user_exists(host_url: str, api_key: str, username: str) -> dict | None:
+    status, data = host_request(
+        host_url, api_key, "GET",
+        f"/api/client/users/check?username={username}",
+        timeout=15,
+    )
+    if status == 200 and isinstance(data, dict):
+        return data
+    return None
 
 
-def prompt_admin_credentials() -> tuple[str, str]:
-    info("Creating a client_admin account on this client.")
-    username = ""
-    while not username:
-        username = input("    Admin username: ").strip()
+def create_admin(host_url: str, api_key: str, username: str, password: str) -> bool:
+    status, data = host_request(
+        host_url, api_key, "POST", "/api/client/users",
+        body={"username": username, "password": password, "role": "client_admin"},
+    )
+    if status == 201:
+        return True
+    if status == 409:
+        return False
+    raise RuntimeError(f"Host returned status {status}: {data}")
+
+
+def do_admin_account(host_url: str, api_key: str) -> tuple[str, str]:
     while True:
-        pw = getpass.getpass("    Admin password (min 8 chars): ").strip()
-        confirm = getpass.getpass("    Confirm password: ").strip()
+        username = ask("Username  ")
+        if not username:
+            out("          " + grey("Username required."))
+            continue
+        check = check_user_exists(host_url, api_key, username)
+        if check and check.get("exists"):
+            role = check.get("role", "?")
+            out("          " + warn_inline(f"user '{username}' exists (role={role})"))
+            choice = ask("Use existing / new username [y/n/new]", "y").lower()
+            if choice in ("y", "yes"):
+                pw = getpass.getpass("          Password  ").strip()
+                return username, pw
+            if choice == "new":
+                continue
+            sys.exit(1)
+        pw = getpass.getpass("          Password (min 8) ").strip()
+        confirm = getpass.getpass("          Confirm        ").strip()
         if pw != confirm:
-            print("    Passwords do not match. Try again.")
+            out("          " + grey("Passwords do not match."))
             continue
         if len(pw) < 8:
-            print("    Password must be at least 8 characters.")
+            out("          " + grey("Password must be at least 8 characters."))
+            continue
+        try:
+            create_admin(host_url, api_key, username, pw)
+        except RuntimeError as e:
+            out("          " + fail_inline(str(e)))
             continue
         return username, pw
 
-
-def create_admin(host_url: str, api_key: str, username: str, password: str) -> None:
-    py = venv_python()
-    info(f"POST {host_url}/api/client/users (role=client_admin) ...")
-    body = json.dumps({"username": username, "password": password,
-                       "role": "client_admin"}).replace('"', '\\"')
-    code = (
-        "import sys\n"
-        "import httpx, json\n"
-        f"resp = httpx.post('{host_url}/api/client/users',"
-        f" headers={{'X-API-Key': '{api_key}'}},"
-        f" json=json.loads('{body}'), timeout=30)\n"
-        "print('STATUS', resp.status_code)\n"
-        "print(resp.text)\n"
-    )
-    res = subprocess.run([str(py), "-c", code], capture_output=True, text=True)
-    out = res.stdout
-    if "STATUS 201" in out:
-        ok(f"Created user '{username}' with role 'client_admin'.")
-        return
-    if "STATUS 409" in out:
-        body_line = out.split("STATUS 409", 1)[1].strip()
-        try:
-            detail = json.loads(body_line).get("detail", "")
-        except Exception:
-            detail = body_line
-        warn(f"{detail}")
-        if ask_yes_no("Continue with existing user?", default=True):
-            return
-        sys.exit(1)
-    fail("Host returned non-201 response.")
-    print(out[-500:])
-    sys.exit(1)
-
-
-
-def save_client_json(host_url: str, api_key: str, validate_data: dict) -> None:
+def do_save_client_json(host_url: str, api_key: str, validate_data: dict) -> None:
     DATA_DIR.mkdir(exist_ok=True, parents=True)
     payload = {
         "client_id": validate_data.get("client_id"),
@@ -442,57 +423,78 @@ def save_client_json(host_url: str, api_key: str, validate_data: dict) -> None:
         os.chmod(CLIENT_JSON, 0o600)
     except OSError:
         pass
-    ok(f"Saved {CLIENT_JSON}")
 
-
-
-def step_desktop_shortcut() -> None:
-    if not ask_yes_no("Create a desktop shortcut to start GGEO?",
-                       default=True):
-        info("Skipped.")
-        return
-    system = platform.system()
+def get_windows_desktop() -> Path:
     try:
-        if system == "Darwin":
-            _create_macos_shortcut()
-        elif system == "Windows":
-            _create_windows_shortcut()
-        elif system == "Linux":
-            _create_linux_shortcut()
-        else:
-            warn(f"Unsupported platform: {system}")
-    except Exception as e:
-        warn(f"Could not create shortcut: {e}")
+        import ctypes
+        from ctypes import wintypes, windll
+        CSIDL_DESKTOP = 0x0000
+        SHGFP_TYPE_CURRENT = 0
+        buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+        windll.shell32.SHGetFolderPathW(0, CSIDL_DESKTOP, 0,
+                                        SHGFP_TYPE_CURRENT, buf)
+        if buf.value:
+            return Path(buf.value)
+    except Exception:
+        pass
+    return Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop"
 
 
-def _create_macos_shortcut() -> None:
-    """Compile an AppleScript .app that opens Terminal + sudo run.py."""
+def detect_old_shortcuts() -> list[Path]:
+    found: list[Path] = []
+    system = platform.system()
+    if system == "Darwin":
+        for parent in (Path.home() / "Desktop", Path.home() / "Applications",
+                       Path("/Applications")):
+            if not parent.is_dir():
+                continue
+            for app in parent.glob("*.app"):
+                name = app.name.lower()
+                if "ggeo" in name or "gpro" in name:
+                    found.append(app)
+    elif system == "Windows":
+        seen: set[str] = set()
+        for parent in (get_windows_desktop(),
+                       Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop"):
+            key = str(parent).lower()
+            if key in seen or not parent.is_dir():
+                continue
+            seen.add(key)
+            for lnk in parent.glob("*.lnk"):
+                if "ggeo" in lnk.name.lower() or "gpro" in lnk.name.lower():
+                    found.append(lnk)
+    return found
+
+
+def remove_paths(paths: list[Path]) -> int:
+    n = 0
+    for p in paths:
+        try:
+            if p.is_dir():
+                subprocess.run(["rm", "-rf", str(p)], check=False)
+            else:
+                p.unlink(missing_ok=True)
+            n += 1
+        except Exception:
+            pass
+    return n
+
+
+def create_macos_shortcut() -> tuple[bool, str]:
     SCRIPTS_DIR.mkdir(exist_ok=True)
     helper = SCRIPTS_DIR / "ggeo-launcher.sh"
     py = venv_python()
     helper.write_text(
         "#!/bin/bash\n"
-        "# GGEO v2.2.0 — macOS launcher (invoked by GGEO.app)\n\n"
         f'cd "{ROOT}" || exit 1\n\n'
-        "B=$'\\033[1m'; C=$'\\033[96m'; Y=$'\\033[93m'; D=$'\\033[2m'; R=$'\\033[0m'\n"
-        'URL="http://ggeo-client.local:8479/"\n\n'
-        'printf "\\n"\n'
-        'printf "  ${B}${C}GGEO Client${R}  ${D}v2.2.0${R}\\n"\n'
-        'printf "  ${D}GPS Location Spoofer for iOS — Distributed Build${R}\\n"\n'
-        'printf "  ${D}────────────────────────────────────────${R}\\n\\n"\n'
-        "if lsof -iTCP:8479 -sTCP:LISTEN >/dev/null 2>&1; then\n"
-        '    printf "  ${Y}[WARN] Server already running on port 8479.${R}\\n"\n'
-        '    printf "  Opening ${C}${URL}${R}\\n\\n"\n'
-        '    sleep 1; open "${URL}"\n'
-        '    read -n 1 -s -r -p "  Press any key to close..."\n'
-        '    printf "\\n"; exit 0\n'
+        "B=$'\\033[1m'; C=$'\\033[96m'; D=$'\\033[2m'; R=$'\\033[0m'\n"
+        f'URL="http://ggeo-client.local:{DEFAULT_PORT}/"\n\n'
+        f"if lsof -iTCP:{DEFAULT_PORT} -sTCP:LISTEN >/dev/null 2>&1; then\n"
+        '    open "${URL}"; exit 0\n'
         "fi\n\n"
-        'printf "  ${D}Starting server…${R}\\n"\n'
-        'printf "  ${D}sudo password needed for utun tunnel.${R}\\n\\n"\n'
-        '( sleep 4 && open "${URL}" ) &\n\n'
+        '( sleep 4 && open "${URL}" ) &\n'
         f'sudo "{py}" run.py\n'
-        'EXIT_CODE=$?\n\n'
-        'printf "\\n  ${D}Server stopped (exit %d).${R}\\n" "${EXIT_CODE}"\n'
+        'EXIT_CODE=$?\n'
         'read -n 1 -s -r -p "  Press any key to close..."\n'
         'printf "\\n"\n'
     )
@@ -506,7 +508,7 @@ def _create_macos_shortcut() -> None:
         '        do script "clear && exec " & quoted form of launcherScript\n'
         "        delay 0.3\n"
         "        try\n"
-        '            set custom title of front window to "GGEO Client v2.2.0"\n'
+        f'            set custom title of front window to "{SHORTCUT_LABEL}"\n'
         "        end try\n"
         "    end tell\n"
         "end run\n"
@@ -518,25 +520,33 @@ def _create_macos_shortcut() -> None:
         applescript_path = tf.name
 
     desktop = Path.home() / "Desktop"
-    app_path = desktop / "GGEO Client.app"
+    app_path = desktop / f"{SHORTCUT_LABEL}.app"
     if app_path.exists():
         subprocess.run(["rm", "-rf", str(app_path)], check=False)
-    res = subprocess.run(
-        ["osacompile", "-o", str(app_path), applescript_path],
-        capture_output=True, text=True,
-    )
+    icns = SCRIPTS_DIR / "macos" / "ggeo.icns"
+    cmd = ["osacompile"]
+    if icns.exists():
+        cmd += ["-i", str(icns)]
+    cmd += ["-o", str(app_path), applescript_path]
+    res = subprocess.run(cmd, capture_output=True, text=True)
     try:
         os.unlink(applescript_path)
     except OSError:
         pass
     if res.returncode != 0:
-        warn(f"osacompile failed: {res.stderr.strip()}")
-    else:
-        ok(f"Desktop shortcut: {app_path}")
+        return False, f"osacompile failed: {res.stderr.strip()[:80]}"
+    subprocess.run(["codesign", "--force", "--deep", "-s", "-", str(app_path)],
+                   capture_output=True)
+    try:
+        os.utime(app_path, None)
+    except OSError:
+        pass
+    if not app_path.exists() or not (app_path / "Contents" / "Info.plist").exists():
+        return False, "verification failed"
+    return True, str(app_path.relative_to(Path.home())) if app_path.is_relative_to(Path.home()) else str(app_path)
 
 
-def _create_windows_shortcut() -> None:
-    """Create GGEO.bat at root + .lnk on Desktop with icon + admin flag."""
+def create_windows_shortcut() -> tuple[bool, str]:
     SCRIPTS_DIR.mkdir(exist_ok=True)
     bat_path = SCRIPTS_DIR / "ggeo-launcher.bat"
     icon_path = ROOT / "ggeo" / "static" / "favicon.ico"
@@ -544,158 +554,348 @@ def _create_windows_shortcut() -> None:
         "@echo off\n"
         "setlocal\n"
         'cd /d "%~dp0.."\n'
-        "title GGEO Client v2.2.0\n"
+        f"title {SHORTCUT_LABEL}\n"
         "cls\n"
-        "echo.\n"
-        "echo   GGEO Client v2.2.0 - Distributed GPS Spoofer\n"
-        "echo.\n"
         'start "" /B cmd /C "timeout /t 4 /nobreak >nul && '
-        'start http://ggeo-client.local:8479/"\n'
+        f'start http://ggeo-client.local:{DEFAULT_PORT}/"\n'
         "venv\\Scripts\\python.exe run.py\n"
         "pause\n"
     )
-    root_launcher = ROOT / "GGEO.bat"
-    root_launcher.write_text(f'@echo off\ncall "{bat_path}"\n')
-    ok(f"Launcher created: {root_launcher}")
 
-    desktop_ok = False
-    user_profile = os.environ.get("USERPROFILE", str(Path.home()))
-    candidates = [
-        Path(user_profile) / "OneDrive" / "Desktop",
-        Path(user_profile) / "Desktop",
-        Path.home() / "Desktop",
-    ]
-    seen: set[str] = set()
-    for desktop_dir in candidates:
-        key = str(desktop_dir).lower()
-        if key in seen or not desktop_dir.is_dir():
-            continue
-        seen.add(key)
-        lnk_path = desktop_dir / "GGEO Client.lnk"
+    desktop = get_windows_desktop()
+    if not desktop.is_dir():
+        return False, f"Desktop not found: {desktop}"
+    lnk_path = desktop / f"{SHORTCUT_LABEL}.lnk"
+    ok = False
+    try:
+        import pythoncom
+        from win32com.shell import shell
+        link = pythoncom.CoCreateInstance(
+            shell.CLSID_ShellLink, None,
+            pythoncom.CLSCTX_INPROC_SERVER, shell.IID_IShellLink,
+        )
+        link.SetPath(str(bat_path))
+        link.SetWorkingDirectory(str(ROOT))
+        if icon_path.exists():
+            link.SetIconLocation(str(icon_path), 0)
+        link.SetDescription(SHORTCUT_LABEL)
+        link.QueryInterface(pythoncom.IID_IPersistFile).Save(str(lnk_path), 0)
         try:
-            vbs_content = (
-                'Set WshShell = CreateObject("WScript.Shell")\n'
-                f'Set oShortcut = WshShell.CreateShortcut("{lnk_path}")\n'
-                f'oShortcut.TargetPath = "{bat_path}"\n'
-                f'oShortcut.WorkingDirectory = "{ROOT}"\n'
-                f'oShortcut.IconLocation = "{icon_path}"\n'
-                'oShortcut.Description = "GGEO Client - GPS Spoofer"\n'
-                'oShortcut.Save\n'
-            )
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".vbs", delete=False, dir=str(ROOT),
-            ) as tf:
-                tf.write(vbs_content)
-                vbs_file = tf.name
-            res = subprocess.run(
+            with open(lnk_path, "r+b") as f:
+                f.seek(0x15)
+                b = f.read(1)
+                f.seek(0x15)
+                f.write(bytes([b[0] | 0x20]))
+        except Exception:
+            pass
+        ok = lnk_path.exists()
+    except ImportError:
+        vbs_content = (
+            'Set WshShell = CreateObject("WScript.Shell")\n'
+            f'Set oShortcut = WshShell.CreateShortcut("{lnk_path}")\n'
+            f'oShortcut.TargetPath = "{bat_path}"\n'
+            f'oShortcut.WorkingDirectory = "{ROOT}"\n'
+            f'oShortcut.IconLocation = "{icon_path}"\n'
+            f'oShortcut.Description = "{SHORTCUT_LABEL}"\n'
+            'oShortcut.Save\n'
+        )
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".vbs", delete=False, dir=str(ROOT),
+        ) as tf:
+            tf.write(vbs_content)
+            vbs_file = tf.name
+        try:
+            subprocess.run(
                 ["cscript", "//Nologo", vbs_file],
                 capture_output=True, text=True, timeout=15,
             )
+        finally:
             try:
                 os.unlink(vbs_file)
             except OSError:
                 pass
-            if res.returncode == 0 and lnk_path.exists():
-                ok(f"Desktop shortcut: {lnk_path}")
-                desktop_ok = True
-                break
-        except Exception as e:
-            warn(f"Tried {desktop_dir}: {e}")
-    if not desktop_ok:
-        warn("Could not create desktop shortcut on any standard Desktop path.")
-        info(f"Fallback: launch via {root_launcher}")
-
-
-def _create_linux_shortcut() -> None:
-    desktop = Path.home() / "Desktop"
-    desktop.mkdir(exist_ok=True)
-    df = desktop / "ggeo-client.desktop"
-    df.write_text(
-        "[Desktop Entry]\n"
-        "Type=Application\n"
-        "Name=GGEO Client\n"
-        f"Exec=sudo {venv_python()} {ROOT / 'run.py'}\n"
-        f"Path={ROOT}\n"
-        "Terminal=true\n"
-    )
-    df.chmod(0o755)
-    ok(f"Desktop shortcut: {df}")
-
-
-
-def step_autostart() -> None:
-    if not ask_yes_no(
-        "Configure GGEO to start automatically when you log in?",
-        default=False,
-    ):
-        info("Skipped. You can enable later via the system tray menu.")
-        return
-    sys.path.insert(0, str(ROOT))
-    try:
-        from ggeo.autostart import install_autostart
-        success, msg = install_autostart()
-        if success:
-            ok(msg)
-        else:
-            warn(f"Autostart not configured: {msg}")
+        ok = lnk_path.exists()
     except Exception as e:
-        warn(f"Could not register autostart: {e}")
+        return False, f"shortcut creation failed: {e}"
+
+    if not ok:
+        return False, "shortcut not created"
+    return True, str(lnk_path)
 
 
+def do_desktop_shortcut() -> str:
+    if not ask_yes_no("Create desktop shortcut?", default=True):
+        return grey("skipped")
+    old = detect_old_shortcuts()
+    if old:
+        out("          " + warn_inline(f"found {len(old)} existing GGeo shortcut(s)"))
+        for p in old[:5]:
+            try:
+                rel = p.relative_to(Path.home())
+                out("          " + grey(f"  ~/{rel}"))
+            except ValueError:
+                out("          " + grey(f"  {p}"))
+        if ask_yes_no("Remove existing?", default=True):
+            n = remove_paths(old)
+            out("          " + ok_inline(f"removed {n}"))
 
+    system = platform.system()
+    if system == "Darwin":
+        ok, msg = create_macos_shortcut()
+    elif system == "Windows":
+        ok, msg = create_windows_shortcut()
+    else:
+        return grey("not supported on " + system)
+
+    if ok:
+        return ok_inline(msg)
+    return fail_inline(msg)
+
+def detect_old_autostart() -> list[Path | str]:
+    found: list[Path | str] = []
+    system = platform.system()
+    if system == "Darwin":
+        agents = Path.home() / "Library" / "LaunchAgents"
+        if agents.is_dir():
+            for plist in agents.glob("com.ggeo.*.plist"):
+                found.append(plist)
+    elif system == "Windows":
+        try:
+            import winreg
+            with winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0, winreg.KEY_READ,
+            ) as k:
+                i = 0
+                while True:
+                    try:
+                        name, _, _ = winreg.EnumValue(k, i)
+                    except OSError:
+                        break
+                    if "ggeo" in name.lower() or "gpro" in name.lower():
+                        found.append(f"HKCU\\...\\Run\\{name}")
+                    i += 1
+        except Exception:
+            pass
+    return found
+
+
+def remove_old_autostart(items: list[Path | str]) -> int:
+    n = 0
+    for item in items:
+        if isinstance(item, Path):
+            try:
+                if platform.system() == "Darwin":
+                    label = item.stem
+                    subprocess.run(["launchctl", "unload", str(item)],
+                                   capture_output=True)
+                item.unlink(missing_ok=True)
+                n += 1
+            except Exception:
+                pass
+        elif isinstance(item, str) and item.startswith("HKCU"):
+            try:
+                import winreg
+                value_name = item.split("\\")[-1]
+                with winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Run",
+                    0, winreg.KEY_SET_VALUE,
+                ) as k:
+                    winreg.DeleteValue(k, value_name)
+                n += 1
+            except Exception:
+                pass
+    return n
+
+
+def install_autostart_macos() -> tuple[bool, str]:
+    plist_path = Path.home() / "Library" / "LaunchAgents" / f"{AUTOSTART_LABEL}.plist"
+    plist_path.parent.mkdir(parents=True, exist_ok=True)
+    py = venv_python()
+    tray_py = ROOT / "tray.py"
+    plist_path.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+        '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+        '<plist version="1.0">\n'
+        '<dict>\n'
+        f'    <key>Label</key><string>{AUTOSTART_LABEL}</string>\n'
+        f'    <key>ProgramArguments</key>\n'
+        '    <array>\n'
+        f'        <string>{py}</string>\n'
+        f'        <string>{tray_py}</string>\n'
+        '    </array>\n'
+        f'    <key>WorkingDirectory</key><string>{ROOT}</string>\n'
+        '    <key>RunAtLoad</key><true/>\n'
+        '    <key>KeepAlive</key><false/>\n'
+        f'    <key>StandardOutPath</key><string>{ROOT / "data" / "tray.stdout.log"}</string>\n'
+        f'    <key>StandardErrorPath</key><string>{ROOT / "data" / "tray.stderr.log"}</string>\n'
+        '</dict>\n'
+        '</plist>\n'
+    )
+    res = subprocess.run(["launchctl", "load", str(plist_path)],
+                         capture_output=True, text=True)
+    if res.returncode != 0:
+        return False, f"launchctl load failed: {res.stderr.strip()[:60]}"
+    check = subprocess.run(["launchctl", "list", AUTOSTART_LABEL],
+                           capture_output=True, text=True)
+    if check.returncode != 0:
+        return False, "launchctl list verify failed"
+    return True, AUTOSTART_LABEL
+
+
+def install_autostart_windows() -> tuple[bool, str]:
+    try:
+        import winreg
+    except ImportError:
+        return False, "winreg unavailable"
+    py = venv_python()
+    tray_py = ROOT / "tray.py"
+    cmd = f'"{py}" "{tray_py}"'
+    value_name = SHORTCUT_LABEL
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0, winreg.KEY_SET_VALUE,
+        ) as k:
+            winreg.SetValueEx(k, value_name, 0, winreg.REG_SZ, cmd)
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0, winreg.KEY_READ,
+        ) as k:
+            winreg.QueryValueEx(k, value_name)
+        return True, f"HKCU\\...\\Run\\{value_name}"
+    except Exception as e:
+        return False, f"registry write failed: {e}"
+
+
+def do_autostart() -> str:
+    if not ask_yes_no("Configure autostart on login?", default=False):
+        return grey("skipped")
+
+    old = detect_old_autostart()
+    if old:
+        out("          " + warn_inline(f"found {len(old)} existing autostart(s)"))
+        for it in old[:5]:
+            label = it.name if isinstance(it, Path) else it
+            out("          " + grey(f"  {label}"))
+        if ask_yes_no("Remove existing?", default=True):
+            n = remove_old_autostart(old)
+            out("          " + ok_inline(f"removed {n}"))
+
+    system = platform.system()
+    if system == "Darwin":
+        ok, msg = install_autostart_macos()
+    elif system == "Windows":
+        ok, msg = install_autostart_windows()
+    else:
+        return grey("not supported on " + system)
+
+    if ok:
+        return ok_inline(msg)
+    return fail_inline(msg)
+
+def _restore_ownership() -> None:
+    if platform.system() != "Darwin":
+        return
+    sudo_user = os.environ.get("SUDO_USER")
+    if not sudo_user:
+        return
+    try:
+        import pwd
+        pw = pwd.getpwnam(sudo_user)
+    except Exception:
+        return
+    targets = [VENV_DIR, DATA_DIR, SCRIPTS_DIR, CLIENT_JSON]
+    for path in targets:
+        if path.exists():
+            subprocess.run(
+                ["chown", "-R", f"{pw.pw_uid}:{pw.pw_gid}", str(path)],
+                capture_output=True,
+            )
+def closing_card() -> list[str]:
+    width = DEFAULT_BOX_WIDTH
+    out_lines: list[str] = []
+    from ggeo.cli import box_top, box_bot, box_line
+    out_lines.append(box_top(width))
+    out_lines.append(box_line(width=width))
+    out_lines.append(box_line("  " + green_b(SYM_OK) + " Setup complete", width))
+    out_lines.append(box_line(width=width))
+    if platform.system() in ("Darwin", "Windows"):
+        out_lines.append(box_line(
+            "  Start  double-click '" + cyan(SHORTCUT_LABEL) + "' on Desktop",
+            width,
+        ))
+    else:
+        out_lines.append(box_line(
+            f"  Start  cd {ROOT} && sudo venv/bin/python run.py",
+            width,
+        ))
+    out_lines.append(box_line(width=width))
+    out_lines.append(box_bot(width))
+    return out_lines
 def main() -> None:
-    banner("GGEO Client v2.2.0 — Setup Wizard")
-
-    step(1, 10, "Python version check")
-    step_python_version()
-
-    step(2, 10, "Virtual environment")
-    step_virtualenv()
-
-    step(3, 10, "Install dependencies")
-    step_install_deps()
-
-    step(4, 10, "usbmuxd / Bonjour Service check")
-    step_service_checks()
-
-    step(5, 10, "Host URL + API key")
+    out("")
+    out_lines(banner_setup(VERSION))
+    out("")
+    step(1, "Python version check")
+    py_ver = do_python_check()
+    step_overwrite(1, "Python version check", ok_inline(py_ver))
+    step(2, "Virtual environment")
+    venv_status = do_virtualenv()
+    step_overwrite(2, "Virtual environment", ok_inline(venv_status))
+    step(3, "Installing dependencies")
+    do_install_deps()
+    step_overwrite(3, "Installing dependencies", ok_inline())
+    step(4, "Service checks")
+    services = do_service_checks()
+    svc_status = ok_inline(" · ".join(services)) if services else warn_inline("none active")
+    step_overwrite(4, "Service checks", svc_status)
+    step(5, "Host configuration")
     host_url = prompt_url()
     api_key = prompt_api_key()
-
-    step(6, 10, "Validate with host")
-    validate_data = validate_with_host(host_url, api_key)
-
-    step(7, 10, "Create client admin account")
-    username, password = prompt_admin_credentials()
-    create_admin(host_url, api_key, username, password)
-
-    step(8, 10, "Save data/client.json")
-    save_client_json(host_url, api_key, validate_data)
-
-    step(9, 10, "Desktop shortcut (optional)")
-    step_desktop_shortcut()
-
-    step(10, 10, "Autostart on login (optional)")
-    step_autostart()
-
-    banner("Setup complete!")
-    print(f"  Client name : {validate_data.get('client_name')}")
-    print(f"  Host URL    : {host_url}")
-    print(f"  Admin user  : {username}")
-    print()
-    print("  To start the server:")
-    if platform.system() == "Darwin":
-        print("    Double-click 'GGEO Client.app' on Desktop")
-        print(f"    or:  cd {ROOT} && sudo venv/bin/python run.py")
-    elif platform.system() == "Windows":
-        print("    Double-click 'GGEO Client' on Desktop")
-        print(f"    or:  cd {ROOT} & venv\\Scripts\\python.exe run.py")
-    else:
-        print(f"    cd {ROOT} && sudo venv/bin/python run.py")
-    print()
-    print("  Then open: http://ggeo-client.local:8479/")
-    print("=" * 60)
+    out_field("Host URL", host_url)
+    out_field("API key", "********")
+    step(6, "Validate")
+    validate_data = do_validate(host_url, api_key)
+    name = validate_data.get("client_name") or "?"
+    limits = validate_data.get("limits") or {}
+    mode = validate_data.get("location_mode") or limits.get("location_mode") or "?"
+    step_overwrite(6, "Validate", ok_inline(f"{name} · {mode}"))
+    out_indent(grey(
+        f"{limits.get('max_devices', '?')} dev · "
+        f"{limits.get('max_users', '?')} user · "
+        f"{limits.get('max_locations', '?')} loc"
+    ))
+    step(7, "Admin account")
+    username, _ = do_admin_account(host_url, api_key)
+    step(8, "Save data/client.json")
+    do_save_client_json(host_url, api_key, validate_data)
+    step_overwrite(8, "Save data/client.json", ok_inline())
+    step(9, "Desktop shortcut")
+    sh_status = do_desktop_shortcut()
+    step_overwrite(9, "Desktop shortcut", sh_status)
+    step(10, "Autostart on login")
+    as_status = do_autostart()
+    step_overwrite(10, "Autostart on login", as_status)
+    _restore_ownership()
+    out("")
+    out_lines(closing_card())
+    out("")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print()
+        print(grey("Setup cancelled."))
+        sys.exit(130)
+    except Exception as e:
+        print()
+        print(red_b(f"  {SYM_FAIL} Setup error: {e}"))
+        sys.exit(1)

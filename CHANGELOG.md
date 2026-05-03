@@ -5,6 +5,60 @@ All notable changes to GGEO Client will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] — 2026-05-03
+
+PyArmor multi-Python ABI build, wizard redesign, port change.
+
+### Build / distribution
+
+- PyArmor build matrix on CI: 3 Python versions (3.11, 3.12, 3.13)
+  build in parallel. Output goes to `dist/<py_tag>/` per build, merged
+  in CI. Resolves Windows ABI mismatch (`.pyd` was hard-linked to
+  `python311.dll` only) — see `Report/v2/redesign/reports/pyarmor-windows-abi-bug.md`.
+- Top-level `run.py` and `tray.py` are plain Python dispatchers that
+  detect the running Python version and exec the matching `pyXXX/`
+  obfuscated tree.
+- `setup.py` strict guard rejects Python outside 3.11/3.12/3.13.
+- `pywin32` added to `requirements.txt` with `sys_platform == 'win32'`
+  marker for `IShellLink` desktop shortcut creation.
+
+### Setup wizard
+
+- Visual redesign with `╔╗╚╝` double-line banner, logo, ANSI colors.
+- Compact 1-line per step with `✓ ⚠ ✗` indicators.
+- Auto-elevate: macOS re-execs with sudo, Windows force-closes
+  outside elevation.
+- Detect existing GGeo shortcuts and autostart entries (any version)
+  and offer to remove before installing the new one.
+- Verify install actually applied (file exists + functional checks)
+  rather than trusting subprocess return code.
+- Version-named artifacts: `GGeo Client v2.3.0.app/.lnk` and
+  `com.ggeo.tray.v2_3_0` LaunchAgent label.
+- macOS: custom `.icns` icon embedded via `osacompile -i`.
+- Windows: `IShellLink` via pywin32 + `favicon.ico` + Run-As-Admin
+  flag (byte 0x15 OR 0x20). Falls back to VBS if pywin32 missing.
+- Windows: `SHGetFolderPath(CSIDL_DESKTOP)` honors OneDrive Known
+  Folder Move redirect.
+- Admin existence pre-check via new host endpoint
+  `GET /api/client/users/check`; user picks "use existing / new
+  username" before being prompted for password.
+- Restore ownership (`chown -R` to `SUDO_USER`) at the end so files
+  created during sudo run aren't left root-owned.
+
+### Runtime dashboard (`run.py`)
+
+- Static banner with status indicator + URLs (Local / Network /
+  Host / Logs path) rendered once at startup.
+- Bottom status line in-place via `\r` — spinner + uptime,
+  no per-request log spam.
+- `uvicorn` runs with `access_log=False` and `log_level="warning"`;
+  full request log goes to `data/ggeo.log` only (RotatingFileHandler).
+- Force-close box if not running with sudo on macOS / Linux.
+
+### Other
+
+- Port default `8479` → `8484`.
+
 ## [2.2.0] — 2026-05-03
 
 UI redesign + macOS scan reliability fix.

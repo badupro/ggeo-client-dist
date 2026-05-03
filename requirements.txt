@@ -28,3 +28,6 @@ pillow>=10.0.0
 # Skipped on macOS / Linux via platform marker.
 pywintunx-pmd3>=1.0.2; sys_platform == "win32"
 
+# Windows-only: shell APIs (IShellLink for desktop shortcut, etc.)
+pywin32>=306; sys_platform == "win32"
+

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GGeo Client launcher — dispatch to obfuscated tree matching Python version."""
+"""GGeo Client launcher."""
 from __future__ import annotations
 
 import os
