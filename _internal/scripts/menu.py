@@ -179,10 +179,21 @@ def kill_port_8484() -> None:
         except Exception:
             pass
     else:
-        os.system(
-            'sudo lsof -iTCP:8484 -sTCP:LISTEN -t -P 2>/dev/null '
-            '| xargs -r sudo kill -9 2>/dev/null'
+        try:
+            res = subprocess.run(
+                ["lsof", "-iTCP:8484", "-sTCP:LISTEN", "-t", "-P"],
+                capture_output=True, text=True, timeout=3,
+            )
+            pids = [p.strip() for p in res.stdout.split() if p.strip()]
+            if not pids:
+                return
+        except Exception:
+            return
+        subprocess.run(
+            ["sudo", "-n", "kill", "-9", *pids],
+            capture_output=True,
         )
+        time.sleep(0.3)
 
 
 def action_setup() -> None:
@@ -281,19 +292,17 @@ def action_update() -> None:
 
     total = 5
 
-    step_print(1, total, "Stopping server")
     kill_port_8484()
-    step_overwrite(1, total, "Stopping server", ok_inline())
+    step_print(1, total, "Stopping server", ok_inline())
 
-    step_print(2, total, "Pulling from GitHub")
     res = subprocess.run(
         ["git", "-C", str(ROOT), "fetch", "origin", "main"],
         capture_output=True, text=True,
     )
     if res.returncode != 0:
-        err = (res.stderr or res.stdout).strip().splitlines()[-1][:80] if (res.stderr or res.stdout).strip() else "rc=%d" % res.returncode
-        step_overwrite(2, total, "Pulling from GitHub", fail_inline(f"fetch: {err}"))
-        print(f"\n  {DIM}{(res.stderr or res.stdout).strip()[:300]}{RST}")
+        err = (res.stderr or res.stdout).strip()[:200]
+        step_print(2, total, "Pulling from GitHub", fail_inline("fetch failed"))
+        print(f"\n  {grey(err)}")
         input("\n  Press Enter to close...")
         return
     res = subprocess.run(
@@ -301,14 +310,13 @@ def action_update() -> None:
         capture_output=True, text=True,
     )
     if res.returncode != 0:
-        err = (res.stderr or res.stdout).strip().splitlines()[-1][:80] if (res.stderr or res.stdout).strip() else "rc=%d" % res.returncode
-        step_overwrite(2, total, "Pulling from GitHub", fail_inline(f"reset: {err}"))
-        print(f"\n  {DIM}{(res.stderr or res.stdout).strip()[:300]}{RST}")
+        err = (res.stderr or res.stdout).strip()[:200]
+        step_print(2, total, "Pulling from GitHub", fail_inline("reset failed"))
+        print(f"\n  {grey(err)}")
         input("\n  Press Enter to close...")
         return
-    step_overwrite(2, total, "Pulling from GitHub", ok_inline())
+    step_print(2, total, "Pulling from GitHub", ok_inline())
 
-    step_print(3, total, "Rebuilding venv")
     venv_dir = INTERNAL / "venv"
     if platform.system() == "Windows":
         shutil.rmtree(venv_dir, ignore_errors=True)
@@ -319,12 +327,11 @@ def action_update() -> None:
         capture_output=True, text=True,
     ).returncode
     if rc != 0:
-        step_overwrite(3, total, "Rebuilding venv", fail_inline("venv create"))
+        step_print(3, total, "Rebuilding venv", fail_inline("venv create"))
         input("\n  Press Enter to close...")
         return
-    step_overwrite(3, total, "Rebuilding venv", ok_inline())
+    step_print(3, total, "Rebuilding venv", ok_inline())
 
-    step_print(4, total, "Installing dependencies")
     py = venv_python()
     subprocess.run([str(py), "-m", "pip", "install", "--upgrade", "pip",
                     "--quiet"], capture_output=True)
@@ -334,12 +341,13 @@ def action_update() -> None:
         capture_output=True, text=True,
     ).returncode
     if rc != 0:
-        step_overwrite(4, total, "Installing dependencies", fail_inline("pip"))
+        step_print(4, total, "Installing dependencies", fail_inline("pip"))
         input("\n  Press Enter to close...")
         return
-    step_overwrite(4, total, "Installing dependencies", ok_inline())
+    step_print(4, total, "Installing dependencies", ok_inline())
 
-    step_print(5, total, "Refreshing shortcut + autostart")
+    print()
+    print(f"  {grey('Refreshing shortcut + autostart (running setup auto-mode)...')}")
     env = os.environ.copy()
     env["GGEO_AUTO_MODE"] = "1"
     setup_py = INTERNAL / "setup.py"
@@ -349,10 +357,10 @@ def action_update() -> None:
         setup_cmd = ["sudo", "-E", sys.executable, str(setup_py)]
     rc = subprocess.run(setup_cmd, env=env).returncode
     if rc != 0:
-        step_overwrite(5, total, "Refreshing shortcut + autostart",
-                       warn_inline(f"setup rc={rc}"))
+        step_print(5, total, "Refreshing shortcut + autostart",
+                   warn_inline(f"setup rc={rc}"))
     else:
-        step_overwrite(5, total, "Refreshing shortcut + autostart", ok_inline())
+        step_print(5, total, "Refreshing shortcut + autostart", ok_inline())
 
     new_ver = (ROOT / "VERSION").read_text().strip() if (ROOT / "VERSION").exists() else "?"
     print(render_closing(f"Update complete (v{new_ver})"))
@@ -376,12 +384,10 @@ def action_uninstall() -> None:
         return
     print()
 
-    step_print(1, 4, "Stopping server")
     kill_port_8484()
-    step_overwrite(1, 4, "Stopping server", ok_inline())
+    step_print(1, 4, "Stopping server", ok_inline())
 
     if platform.system() == "Windows":
-        step_print(2, 4, "Removing autostart")
         try:
             import winreg
             with winreg.OpenKey(
@@ -403,9 +409,8 @@ def action_uninstall() -> None:
                     winreg.DeleteValue(k, n)
         except Exception:
             pass
-        step_overwrite(2, 4, "Removing autostart", ok_inline())
+        step_print(2, 4, "Removing autostart", ok_inline())
 
-        step_print(3, 4, "Removing desktop shortcut")
         for desktop in (
             Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop",
             Path(os.environ.get("USERPROFILE", str(Path.home()))) / "OneDrive" / "Desktop",
@@ -416,15 +421,13 @@ def action_uninstall() -> None:
                         lnk.unlink()
                     except Exception:
                         pass
-        step_overwrite(3, 4, "Removing desktop shortcut", ok_inline())
+        step_print(3, 4, "Removing desktop shortcut", ok_inline())
 
-        step_print(4, 4, "Removing install folder")
         os.system(
             f'start /B cmd /C "timeout /t 2 /nobreak > nul && rd /s /q "{ROOT}""'
         )
-        step_overwrite(4, 4, "Removing install folder", ok_inline("scheduled"))
+        step_print(4, 4, "Removing install folder", ok_inline("scheduled"))
     else:
-        step_print(2, 4, "Removing autostart")
         subprocess.run(["sudo", "pkill", "-9", "-f", "_internal/run.py"],
                        capture_output=True)
         subprocess.run(["sudo", "pkill", "-9", "-f", "_internal/tray.py"],
@@ -442,19 +445,17 @@ def action_uninstall() -> None:
                     plist.unlink()
                 except Exception:
                     pass
-        step_overwrite(2, 4, "Removing autostart", ok_inline())
+        step_print(2, 4, "Removing autostart", ok_inline())
 
-        step_print(3, 4, "Removing desktop shortcut")
         for app in list((Path.home() / "Desktop").glob("*GGeo*Client*.app")) + \
                    list((Path.home() / "Desktop").glob("*GGEO*Client*.app")):
             shutil.rmtree(app, ignore_errors=True)
-        step_overwrite(3, 4, "Removing desktop shortcut", ok_inline())
+        step_print(3, 4, "Removing desktop shortcut", ok_inline())
 
-        step_print(4, 4, "Removing install folder")
         trash = f"/tmp/.ggeo-trash-{os.getpid()}"
         subprocess.run(["sudo", "mv", str(ROOT), trash], capture_output=True)
         subprocess.Popen(["sudo", "rm", "-rf", trash])
-        step_overwrite(4, 4, "Removing install folder", ok_inline())
+        step_print(4, 4, "Removing install folder", ok_inline())
 
     print(render_closing("Uninstall complete"))
     input("\n  Press Enter to close...")

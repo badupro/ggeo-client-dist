@@ -821,12 +821,22 @@ def remove_old_autostart(items: list[Path | str]) -> int:
             try:
                 if platform.system() == "Darwin":
                     label = item.stem
-                    subprocess.run(["launchctl", "unload", str(item)],
-                                   capture_output=True)
+                    target_uid = os.environ.get("SUDO_UID") or str(os.getuid())
+                    subprocess.run(
+                        ["launchctl", "bootout", f"gui/{target_uid}/{label}"],
+                        capture_output=True,
+                    )
+                    subprocess.run(
+                        ["launchctl", "bootout", f"system/{label}"],
+                        capture_output=True,
+                    )
                 item.unlink(missing_ok=True)
                 n += 1
             except Exception:
                 pass
+    if platform.system() == "Darwin":
+        subprocess.run(["pkill", "-9", "-f", "_internal/tray.py"],
+                       capture_output=True)
         elif isinstance(item, str) and item.startswith("HKCU"):
             try:
                 import winreg
