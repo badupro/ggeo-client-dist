@@ -62,16 +62,33 @@ def detect_default() -> str:
 
 
 def banner() -> str:
-    return (
-        f"\n{BLUE}╔════════════════════════════════════════════════════╗{RST}\n"
-        f"{BLUE}║                                                    ║{RST}\n"
-        f"{BLUE}║{RST}   {CB}╔═╗╔═╗┌─┐┌─┐{RST}    GGeo Client v{VERSION}"
-        f"{' ' * (16 - len(VERSION))}{BLUE}║{RST}\n"
-        f"{BLUE}║{RST}   {CB}║ ╦║ ╦├┤ │ │{RST}    {DIM}Mobile GPS Location Spoofer{RST}       {BLUE}║{RST}\n"
-        f"{BLUE}║{RST}   {CB}╚═╝╚═╝└─┘└─┘{RST}    {DIM}by Gpro · badupro{RST}                 {BLUE}║{RST}\n"
-        f"{BLUE}║                                                    ║{RST}\n"
-        f"{BLUE}╚════════════════════════════════════════════════════╝{RST}\n"
-    )
+    width = 54
+    inner = width - 2
+    inset = "   "
+    sep = "    "
+    logo_width = 12
+    avail = inner - len(inset) - logo_width - len(sep)
+
+    titles = [
+        (f"GGeo Client v{VERSION}", None),
+        ("Mobile GPS Location Spoofer", DIM),
+        ("by Gpro · badupro", DIM),
+    ]
+    logos = ["╔═╗╔═╗┌─┐┌─┐", "║ ╦║ ╦├┤ │ │", "╚═╝╚═╝└─┘└─┘"]
+
+    lines = ["", BLUE + "╔" + "═" * inner + "╗" + RST,
+             BLUE + "║" + " " * inner + "║" + RST]
+    for logo, (title, style) in zip(logos, titles):
+        pad = max(0, avail - len(title))
+        styled = (style + title + RST) if style else title
+        lines.append(
+            BLUE + "║" + RST
+            + inset + CB + logo + RST + sep + styled + " " * pad
+            + BLUE + "║" + RST
+        )
+    lines.append(BLUE + "║" + " " * inner + "║" + RST)
+    lines.append(BLUE + "╚" + "═" * inner + "╝" + RST)
+    return "\n".join(lines) + "\n"
 
 
 def print_menu(default: str) -> None:
